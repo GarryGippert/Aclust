@@ -16,7 +16,7 @@ MANUSCRIPT IN PREPARATION
 
 1. For each pair of input sequences, a distance is computed using a modified version of ScoreDist (Sohnhammer & Hollich, 2005). Input sequences may represent a multiple alignment, OR, if the input sequences are unaligned, pairwise protein sequence alignments are computed using a local alignment algorithm (Smith & Waterman, 1981) with affine gap penalties. Alignment match scores are computed using Blosum62 (Henikoff & Henikoff, 1992) amino-acid substitution scores in either case.
 
-2. The distance matrix is embedded into orthogonal coordinates using metric matrix distance geometry (Crippen & Havel, 1988).
+2. The distance matrix is embedded into orthogonal coordinates using metric matrix distance geometry (Crippen & Havel, 1988). Each sequence is represented by a point in this M-dimensional space.
 
 3. A nearest-neighbor joining (bifurcating) tree is computed in the orthogonal coordinate space. This is an iterative process in which two (nearest) nodes are replaced by one node at their weighted average position, etc., until a single root node is reached.
 
