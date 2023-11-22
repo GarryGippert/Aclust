@@ -14,13 +14,13 @@ Output Newick file (**_tree.txt**) *output files do share a common prefix
 
 MANUSCRIPT IN PREPARATION
 
-1. For each pair of input sequences, a distance is computed using a modified version of ScoreDist (Sohnhammer & Hollich, 2005). Input sequences may represent a multiple alignment, OR, if the input sequences are unaligned, pairwise protein sequence alignments are computed using a local alignment algorithm (Smith & Waterman, 1981) with affine gap penalties. The Blosum62 amino-acid substitution score matrix is used to determine alignment match scores.
+1. For each pair of input sequences, a distance is computed using a modified version of ScoreDist (Sohnhammer & Hollich, 2005). Input sequences may represent a multiple alignment, OR, if the input sequences are unaligned, pairwise protein sequence alignments are computed using a local alignment algorithm (Smith & Waterman, 1981) with affine gap penalties. Alignment match scores are computed using Blosum62 (Henikoff & Henikoff, 1992) amino-acid substitution scores in either case.
 
-2. The distance matrix is embedded into orthogonal coordinates using metric matrix distance geometry (for example Crippen & Havel, 1988).
+2. The distance matrix is embedded into orthogonal coordinates using metric matrix distance geometry (Crippen & Havel, 1988).
 
 3. A nearest-neighbor joining (bifurcating) tree is computed in the orthogonal coordinate space. This is an iterative process in which two (nearest) nodes are replaced by one node at their weighted average position, etc., until a single root node is reached.
 
-4. Starting with the root node of the tree, points within each left and right sub-branch are independently re-embedded (step 2) and re-joined (step 3). The procedure is repeated recursively, gradually removing deleterious effects caused by large-but-inaccurate distances that arise between sequences sharing low homology.
+4. Starting with the root node of the tree, points within each left and right sub-branch are independently re-embedded (step 2) and re-joined (step 3). The procedure is repeated recursively, gradually removing deleterious effects caused by non-metric distances that arise between sequences sharing low homology.
 
 ### Program Author
 Garry Paul Gippert, Bioengineering, Danish Technical University, Lyngby, Sealand, Denmark. GarryG 'at' dtu 'dot' dk
@@ -34,7 +34,7 @@ Scoredist : [Sonnhammer & Hollich, 2005](https://pubmed.ncbi.nlm.nih.gov/1585751
 
 Local alignment : [Smith & Waterman, 1981](https://pubmed.ncbi.nlm.nih.gov/7265238).
 
-Metric matrix distance geometry : [Crippen & Havel, 1988](https://onlinelibrary.wiley.com/doi/abs/10.1002/jcc.540110212) and references therein.
+Distance matrix embedding : [Crippen & Havel, 1988](https://onlinelibrary.wiley.com/doi/abs/10.1002/jcc.540110212) and references therein. <i>(reference to MDS - Multi-Dimensional Scaling - may be appropriate here.)</i>
 
 Blosum62 : [Henikoff & Henikoff, 1992](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC50453/).
 
