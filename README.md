@@ -1,8 +1,15 @@
-# Aclust
-Alignment and clustering of protein sequences
+# Program: Aclust
+(Alignment and clustering of protein sequences)
 
-The primary task is to generate a phylogenetic tree in Newick format, given Fasta-format protein sequence input.
+The program generate a phylogenetic tree from Fasta protein sequence input.
 
+Input Fasta file
+- Sequences may be pre-aligned (MSA). Otherwise local (SW) alignments are computed.
+
+Output Newick file (**_tree.txt**) *output files do share a common prefix
+- Derived or computed pairwise alignments are written to local files (**_aln.txt** and/or **_aln.js**) enriched with scoredist values.
+- Derived distance matrix is written to local file (**_dmx.txt**).
+.
 ### Brief introduction
 
 MANUSCRIPT IN PREPARATION
@@ -15,8 +22,8 @@ MANUSCRIPT IN PREPARATION
 
 4. Starting with the root node of the tree, points within each left and right sub-branch are independently re-embedded (step 2) and re-joined (step 3). The procedure is repeated recursively, gradually removing deleterious effects caused by large-but-inaccurate distances that arise between sequences sharing low homology.
 
-### Author
+### Program Author
 Garry Paul Gippert, DTU Bioengineering, Lyngby, Sealand, Denmark. GarryG 'at' dtu 'dot' dk
 
 ### Provenance
-Key software and conceptual elements used in Aclust were developed by Garry Paul Gippert while employed at Novozymes A/S, Denmark. The software was relicensed from Novozymes A/S to Garry Paul Gippert under conditions that it would not be commercialized. Aclust is made available under GNU General Public License v3.0.
+Key software and conceptual elements used in Aclust were developed by Garry Paul Gippert while employed at Novozymes A/S, Denmark. The software was kindly relicensed from Novozymes A/S back to Garry Paul Gippert, in 2022, under conditions that it not be commercialized. Aclust is made available under GNU General Public License v3.0.
