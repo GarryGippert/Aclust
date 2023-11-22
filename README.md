@@ -23,7 +23,19 @@ MANUSCRIPT IN PREPARATION
 4. Starting with the root node of the tree, points within each left and right sub-branch are independently re-embedded (step 2) and re-joined (step 3). The procedure is repeated recursively, gradually removing deleterious effects caused by large-but-inaccurate distances that arise between sequences sharing low homology.
 
 ### Program Author
-Garry Paul Gippert, DTU Bioengineering, Lyngby, Sealand, Denmark. GarryG 'at' dtu 'dot' dk
+Garry Paul Gippert, Bioengineering, Danish Technical University, Lyngby, Sealand, Denmark. GarryG 'at' dtu 'dot' dk
 
 ### Provenance
-Key software and conceptual elements used in Aclust were developed by Garry Paul Gippert while employed at Novozymes A/S, Denmark. The software was kindly relicensed from Novozymes A/S back to Garry Paul Gippert, in 2022, under conditions that it not be commercialized. Aclust is made available under GNU General Public License v3.0.
+Key software and conceptual elements used in Aclust were developed by Garry Paul Gippert while employed at Novozymes A/S, Denmark. The software was kindly relicensed by Novozymes A/S back to Garry Paul Gippert, in 2022, under conditions that it not be commercialized. Aclust is made available under GNU General Public License v3.0.
+
+### References
+
+Scoredist : [Sonnhammer & Hollich, 2005](https://pubmed.ncbi.nlm.nih.gov/15857510/).
+
+Local alignment : [Smith & Waterman, 1981](https://pubmed.ncbi.nlm.nih.gov/7265238).
+
+Metric matrix distance geometry : [Crippen & Havel, 1988](https://onlinelibrary.wiley.com/doi/abs/10.1002/jcc.540110212) and references therein.
+
+Blosum62 : [Henikoff & Henikoff, 1992](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC50453/).
+
+GNU public license 3.0 - [License Text](https://www.gnu.org/licenses/gpl-3.0.html#license-text)
