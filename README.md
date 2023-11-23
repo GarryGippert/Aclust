@@ -1,7 +1,7 @@
 # Program: Aclust
 (Alignment and clustering of protein sequences)
 
-The single C-language source program aclust.c generates phylogenetic trees from Fasta protein sequence input.
+Contents: A single C-language source program **aclust.c** that generates phylogenetic trees from Fasta protein sequence input.
 
 Garry Paul Gippert, MANUSCRIPT IN PREPARATION
 
@@ -9,17 +9,36 @@ Briefly:
 
 - A matrix of pairwise distances is computed from sequence alignments.
 
-- A binary tree is computed directly from the distance matrix, using NNJ (Nearest Neighor Joining) and weighted distance averaging when computing branche lengths.
+- A binary tree is computed directly from the distance matrix using NNJ (Nearest Neighor Joining) and count-weighted distance averaging when computing branch lengths to parent.
 
-- A second binary tree is computed also using NNJ, but in the space of orthogonal coordinate obtained by eigenvalue decomposition of the metric (derived from distance) matrix.
+- A second binary tree is computed, also using NNJ, but in the space of orthogonal coordinates obtained by eigenvalue decomposition of the metric matrix derived from the distance matrix (as if it were Euclidean, which in most cases is far from).
 
 - Recursive sub-branch reembedding refines topology and branch lengths, but (drawback) freezes early tree left-right subdivisions.
 
-Make the program:
-'''cd src; make; make install'''
+### Usage:
+Compile the program: <pre>cd src; make; make install</pre>
 
-Run the program:
-'''bin/aclust -s dat/BLOSUM62.dat my.fa'''
+Run the program: <pre>bin/aclust -s dat/BLOSUM62.dat my.fa</pre>
+
+Help with command line parameters: <pre>bin/aclust -h</pre>
+
+### Help with command line parameters
+<b><pre>bin/aclust -h</pre></b>
+<pre>
+aclust [parameters_and_flags] my.fasta [another.fasta ...] 
+
+Required parameters:
+	-s 'path'		file location of substitution score matrix (could be 'dat/BLOSUM62.txt')
+Optional parameters:
+	-p 'string'		prefix for all output files (default=name of first input fasta file)
+	-d integer		embed dimension (default 20)
+Optional flags:
+	-m 			activates to interpret input Fasta as MSA
+Less important flags:
+	-j			deactivates writing of JSON alignment file
+	-nonself		deactivates self alignments
+	-v			activates more verbose output
+</pre>
 
 #### Input and output files
 Input Fasta
@@ -32,7 +51,7 @@ Output Newick trees, alignments, and distance matrix (sharing a common prefix)
 - **_dree.txt** - Distance Matrix tree (newick)
 - **_tree0.txt** - Initial Embed tree (newick)
 - **_tree.txt** - Refined Embed tree (newick)
-.
+
 ### Bit longer introduction
 
 MANUSCRIPT IN PREPARATION
