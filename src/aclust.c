@@ -131,7 +131,7 @@ ACLUST was developed and written by Garry Paul Gippert, and packaged as a single
 #define MAXSEQUENCELEN 10000
 #define MAXFILENAME 1000
 #define MAXLINELEN 1000
-#define DEFAULT_SCORE_MATRIX "$BIA/dat/BLOSUM62.dat"
+#define DEFAULT_SCORE_MATRIX "dat/BLOSUM62.dat"
 
 #define ALIGN_GAP_CHAR '-'
 #define ALIGN_GAP_VAL -99.9
@@ -2308,17 +2308,19 @@ BNODE *bnode_recursive_embed(int n, double **dmx)
 ACLUST  Generates pairwise alignments, distance matrix and phylogenetic tree from protein FASTA input files.\n\
 Input entries may be pre-aligned, for example Fasta format output produced by MAFFT, or unaligned.\n\
 \n\
+Required parameters:\n\
+	-s <path>		file location of substitution score matrix (could be 'dat/BLOSUM62.txt')\n\
 Optional parameters:\n\
-	-s <input_scorematrix_file>	possibly '$BIA/dat/BLOSUM62.txt'\n\
-	-p <output_prefix>		<first_input_filename_including_dotfa>\n\
-	-d <integer>>			embed dimension (default 20)\n\
-\n\
+	-p <string>		prefix for all output files (default=name of first input fasta file)\n\
+	-d <integer>		embed dimension (default 20)\n\
 Optional flags:\n\
-	-m 	activates	M.ultiple alignment mode\n\
-	-j  (de)activates	J.SON output file\n\
-	-v	activates	V.erbose program output\n\
-	-nonself	activates	Non-self, therefore only show off-diagonal alignments\n\
+	-m 			activates to interpret input Fasta as MSA\n\
+Less important flags:\n\
+	-j			deactivates writing of JSON alignment file\n\
+	-nonself		deactivates self alignments\n\
+	-v			activates more verbose output\n\
 \n\
+Input files are Fasta with >accession on one line and sequences on following until the next > is reached\n\
 Output files share a prefix <p>, which is default name of first fasta input file\n\
 	<p>_aln.txt	alignments, text\n\
 	<p>_aln.js	alignments individual JSON rows (optional, activate using -j) \n\
