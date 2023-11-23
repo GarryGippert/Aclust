@@ -26,14 +26,63 @@ sequences sharing low homology.
 Input file(s) contain protein sequences in Fasta format.
 
 Output files produced: (all with shared prefix)
-	prefix_aln.js	JSON-parsable details of each pairwise alignment
-	prefix_dmx.txt	Distance matrix in plain text format <labelI> <labelJ> <distanceIJ>
-	prefix_tree.txt	Newick-format tree
+        prefix_aln.js   JSON-parsable details of each pairwise alignment
+        prefix_dmx.txt  Distance matrix in plain text format <labelI> <labelJ> <distanceIJ>
+        prefix_tree.txt Newick-format tree
 
 ACLUST was developed and written by Garry Paul Gippert, and packaged as a single C source file in 2023.
 
 ACLUST is made available with a GNU General Public License v3.0, and may be used, modified and distributed
 freely as long as license and copyleft notices are preserved.
+*/
+/* ACLUST
+
+Additional notes:
+
+The gap affine penalty used here allows a gap 'cross over' with no additional gap-open penalty.  A
+cross-over gap starts in one alignment string and ends in the other alignment string, with no
+intervening match state.
+
+CROSS-OVER GAP:
+
+In the following, O is the gap opening penalty, and e is the gap extension penalty. In the present
+work, O = 12, e = 1. The crossover allowance reduces the gap penalty by 
+	(2 * O + 4 * e)   -   (O + 5 * e)    =    O - e
+compared to twice opening a gap. (Fictitious example for illustration.)
+
+	usual	     OeeOee		normal cost of two opened gaps
+	cross	     Oeeeee		with cross-over allowance costs O-e less
+	aln1:	ACDEF---KLMNPQRSTV
+	aln2:	ACDEFGHI---NPQRSTV
+
+Re-embedding of isolated sub-branches has the effect of gradually reducing deleterious effects of
+long-range, inaccurate distances.  Probably both the choice of distance function, and algorithmic
+choices such as only taking 20 eigenvalues/vectors, contribute to distortions of local topology when
+including long-range distances.  CAVEAT: Nodes have been observed to be 'trapped' in the wrong initial
+branch, for example when comparing full-length sequences and sequence fragments.
+
+PADDED AND GAPPED ALIGNMENTS:
+
+The GAP symbol '-' is used to indicate non-matched positions within the local alignment. The PAD symbol
+'+' is used to indicate regions of sequence that fall outside the local alignment, and allows the full
+input sequences to be reproduced from the output alignment string.
+
+	>aln1
+	ACGHIKNPQRVWY
+	>aln2
+	DEFGHIKLMNPQRST
+
+For example if we align the two sequences above, we get the folling local alignment having 10 aligned
+positions (starting with G, ending with R), 8 matched positions including a gap of length 2, and a
+total pad length of 20 which accounts for subsequences found outside the local alignment.
+
+	Pair aln1 13 x aln2 15
+	AC+++GHIK--NPQRVWY++
+	++DEFGHIKLMNPQR+++ST
+	Ascore 33 oi 2 o2 3 Plen 20 Alen 10 Mlen 8 Ilen 8 Glen 2 Olen 1 Clen 8 Nlen 8
+	Mscore 46.000000 M1 46 M2 46 MR -8 SD0 18.6776 SD1 39.6954 SD2 50.6719 SD 39.6954
+
+ACLUST was developed and written by Garry Paul Gippert, and packaged as a single C source file in 2023.
 */
 
 #include <stdio.h>
@@ -44,7 +93,7 @@ freely as long as license and copyleft notices are preserved.
 #define MAXSEQUENCELEN 10000
 #define MAXFILENAME 1000
 #define MAXLINELEN 1000
-#define DEFAULT_SCORE_MATRIX "dat/BLOSUM62.dat"
+#define DEFAULT_SCORE_MATRIX "$BIA/dat/BLOSUM62.dat"
 
 #define ALIGN_GAP_CHAR '-'
 #define ALIGN_GAP_VAL -99.9
@@ -55,7 +104,7 @@ freely as long as license and copyleft notices are preserved.
 #define ALIGN_GAP	0x0001	/* enable GAP */
 #define ALIGN_PAD	0x0002	/* enable PAD */
 #define ALIGN_CROSS	0x0004	/* enable gap cross-over */
-#define ALIGN_BODY	0x0008	/* enable gap body-gaps (deprecated) */
+#define ALIGN_BODY	0x0008	/* enable gap body-gaps (not recommended) */
 
 #define	EPSILON		1.0e-8
 #define NEARZERO(a)	(fabs(a) < 10.0*EPSILON ? 0.0 : (a))
@@ -67,6 +116,14 @@ double p_ng = 1.0;		/* next gap penalty */
 int p_json = 1;			/* output alignments in pseudo-json format */
 int p_nonself = 0;		/* do not align with self (show only off-diagonal elements */
 
+char *scorematrixfile = NULL;
+char *oprefix = NULL;
+char *alnfile = NULL;
+char *jsnfile = NULL;
+char *dmxfile = NULL;
+char *dreefile = NULL;
+char *treefile = NULL;
+char *tree0file = NULL;
 
 void j_osb(FILE * fp)
 /* output jsonified open square bracket */
@@ -948,7 +1005,7 @@ double align_stats(char *name1, char *a1, char *name2, char *a2, int expected_pl
 		gap_score = p_fg * (float)(olen) + p_ng * (float)(glen - olen);
 		if (p_v)
 			printf("stats plen %d : '%d%c' vs '%d%c' :  score %g, sumscore %g, gapscore %g, total_score %g\n",
-			       i, n1, a, n2, b, s, sum_score, gap_score, (sum_score - gap_score));
+		       		i, n1, a, n2, b, s, sum_score, gap_score, (sum_score - gap_score));
 		/* ignore pad positions (outside of the local alignment) */
 		if (a == ALIGN_PAD_CHAR || b == ALIGN_PAD_CHAR)
 			continue;
@@ -1046,8 +1103,7 @@ double align_stats(char *name1, char *a1, char *name2, char *a2, int expected_pl
 		j_dbl(jsnfp, YES, "sd0", sd0, NULL, NULL);
 		j_dbl(jsnfp, YES, "sd1", sd1, NULL, NULL);
 		j_dbl(jsnfp, YES, "sd2", sd2, NULL, NULL);
-		j_dbl(jsnfp, NO, "sd", sd, NULL, NULL);	/* last data element receives a NO to solve a json-related
-							   issue */
+		j_dbl(jsnfp, NO, "sd", sd, NULL, NULL); /* last data element receives a NO to solve a json-related issue */
 		j_csb(jsnfp);
 		fflush(jsnfp);
 	}
@@ -1479,13 +1535,16 @@ double bnode_dis(BNODE * A, BNODE * B)
 
 int bnode_count(BNODE * B)
 /* recursive number of defined leaf nodes in tree */
-/* formerly known as bnode_length */
 {
 	if (B->index >= 0)
 		return 1;
 	else if (B->left == NULL || B->right == NULL)
 		fprintf(stderr, "B->left is NULL or B->right is NULL\n"), exit(1);
 	return bnode_count(B->left) + bnode_count(B->right);
+}
+int bnode_length(BNODE *B)
+{
+	return bnode_count(B);
 }
 
 int PRINTNL = 1;
@@ -1605,6 +1664,170 @@ void bnode_bnodei(BNODE * B, BNODE ** bnode, int *i)
 	}
 	else
 		fprintf(stderr, "bnode_bnodei: B->left xor B->right in bnode_bnodei\n"), exit(1);
+}
+
+/* provide a binary tree from a DISTANCE matrix using nearest-neighbor joining algorithm and DISTANCE averaging (yuck) */
+BNODE *bnode_tree_dmx(int n, int *index, double **dmx)
+/* BNODE *bnode_tree_dmx(double **pos, int *index, int n, int dim) */
+{
+
+	/* algorithm: // allocate BNODE vector of length 2N-1, with N of them with 'natural' index numbers (leaf nodes)
+	   // and N-1 of them with index number -1 (tree nodes) without assigning any of them parentage. // allocate
+	   integer 'use' vector of length 2N-1, // alternatively double 'weight' vector of length 2N-1, 1.0 for leafs
+	   0.0 for others... // allocate dmatrix of length 2N-1 x 2N-1, with first N positions taken by actual
+	   distances // find the minimum non-used element in the matrix, join the nodes. */
+
+	int nodes = 2 * n - 1;
+	if (nodes > MAXNODES)
+		fprintf(stderr, "bnode_tree: nodes %d > MAXNODES %d\n", nodes, MAXNODES), exit(1);
+
+	BNODE **bvec = bnode_vec(nodes, 1);
+
+	/* first N BNODE elements are leaf nodes */
+	int i;
+	for (i = 0; i < n; i++) {
+		bvec[i]->index = (index ? index[i] : i);
+		//bvec[i]->dim = dim;
+		//bvec[i]->pos = double_vector_copy(dim, pos[i]);
+	}
+
+	/* extended copy of dmx, availability vector */
+	double **smx = double_matrix(nodes, nodes);
+	int *avail = int_vector(nodes);
+
+	int j, k;
+	for (i = 0; i < n; i++) {
+		avail[i] = 1;
+		for (j = i + 1; j < n; j++) {
+			smx[j][i] = smx[i][j] = dmx[i][j];
+		}
+	}
+
+	if (p_v > 1) {
+		fprintf(stderr, "SMX n %d nodes %d\n", n, nodes);
+		for (i = 0; i < n; i++) {
+			fprintf(stderr, "%d:", i);
+			for (j = 0; j < n; j++)
+				fprintf(stderr, " %7.4g", smx[i][j]);
+			fprintf(stderr, "\n");
+		}
+	}
+
+	/* parent will be one of the allocated nodes */
+	BNODE *P;
+	P = NULL;
+
+	/* nearest neighbor-joining algorithm */
+	int m = n;		/* next available interior node */
+	while (1) {
+		double mins = 1e36;
+		int mini = MAXNODES;
+		int minj = MAXNODES;
+		int found = 0;
+		/* find available (i,j) pair with lowest distance */
+		for (i = 0; i < m; i++) {
+			if (avail[i]) {
+				for (j = i + 1; j < m; j++) {
+					if (avail[j]) {
+						if (smx[i][j] < mins) {
+							mins = smx[i][j];
+							mini = i;
+							minj = j;
+							found++;
+						}
+					}
+				}
+			}
+		}
+		if (!found)
+			break;
+		if (p_v > 1)
+			fprintf(stderr, "found new pair %d %d\n", mini, minj);
+
+		/* point to next available node */
+		P = bvec[m];
+
+		/* left and right subtrees */
+		BNODE *A = bvec[mini];
+		BNODE *B = bvec[minj];
+
+		/* optionally 'rotate' left and right */
+		if (p_r == 'N') {	/* no rotation */
+			P->left = A;
+			P->right = B;
+		} else {
+			int ac = bnode_count(A);
+			int bc = bnode_count(B);
+			if (p_r == 'L') {	/* largest subtree to left */
+				P->left = (ac >= bc ? A : B);
+				P->right = (ac >= bc ? B : A);
+			}
+			else if (p_r == 'R') {	/* largest subtree to right */
+				P->left = (ac >= bc ? B : A);
+				P->right = (ac >= bc ? A : B);
+			}
+		}
+
+		/* and reconnect to parent */
+		P->left->parent = P;
+		P->right->parent = P;
+
+		/* assign left, right and subtree->parent distances */
+		double L = (float)bnode_count(P->left);
+		double R = (float)bnode_count(P->right);
+		P->left_distance = P->left->parent_distance = smx[mini][minj] * R / (L + R);
+		P->right_distance = P->right->parent_distance = smx[mini][minj] * L / (L + R);
+
+		if (p_v > 1) {
+			fprintf(stderr, "intermediate tree\n");
+			bnode_print(stderr, P);
+		}
+
+		if (p_v > 1)
+			bnode_trace(P->left);
+
+		if (p_v > 1)
+			bnode_trace(P->right);
+
+		/* update distance matrix */
+		avail[mini] = 0;
+		avail[minj] = 0;
+
+		/* Average distance model */
+		double del;
+		for (i = 0; i < m; i++) {
+			if (avail[i]) {
+				del = (smx[i][mini] + smx[i][minj]) / 2.0;
+				smx[i][m] = smx[m][i] = del;
+			}
+		}
+
+		/* register availability and increment to next available node */
+		avail[m] = 1;
+		m++;
+	}
+
+	if (m != nodes) {
+		for (i = 0; i < nodes; i++)
+			if (avail[i])
+				fprintf(stderr, "node unused:  i %d, left %s, right %s, parent %s, pos %s, index %d, label %s\n",
+					i,
+					(bvec[i]->left ? "def" : "undef"),
+					(bvec[i]->right ? "def" : "undef"),
+					(bvec[i]->parent ? "def" : "undef"),
+					(bvec[i]->pos ? "def" : "undef"),
+					bvec[i]->index, facc[bvec[i]->index]);
+		fprintf(stderr, "Fatal: m != nodes : n %d, m %d, nodes %d\n", n, m, nodes), exit(1);
+	}
+	if (!P)
+		fprintf(stderr, "bnode_tree: tree is NULL\n"), exit(1);
+
+	/* free */
+	double_matrix_free(nodes, nodes, smx);
+	int_vector_free(nodes, avail);
+	/* NO bnode_vec_free(bvec, nodes); */
+
+	return P;
 }
 
 /* provide a binary tree from a position matrix with dimensions n x dim, using nearest-neighbor joining algorithm */
@@ -1971,30 +2194,6 @@ BNODE *bnode_reembed(BNODE * B, char br, double **odmx, int on, int dim)
 
 }
 
-BNODE *bnode_recursive_embed(int n, double **dmx)
-/* Main Aclust method starts here:
-// 1. embed distance matrix into orthogonal coordinates,
-// 2. build binary tree based on nearest neighbor-joining algorithm.
-// 3. recursively visit each sub-branch and redo embed+tree (steps 1 and 2).
-// Garry Paul Gippert.
-*/
-{
-	int dim = p_dim;
-	double **pos = embed_dmx(n, dmx);
-	int *index = int_vector_ramp(n);
-	BNODE *P = bnode_tree(pos, index, n, dim);
-	if (p_e == 'F') {
-		fprintf(stderr, "Full recursive embed/cluster\n");
-		P->left = bnode_reembed(P->left, 'L', dmx, n, dim);
-		P->right = bnode_reembed(P->right, 'R', dmx, n, dim);
-	}
-	else {
-		fprintf(stderr, "Single pass embed/cluster\n");
-	}
-	int_vector_free(n, index);
-	return P;
-}
-
 void write_tree(BNODE * P, char *filename)
 {
 	FILE *fp;
@@ -2007,6 +2206,9 @@ void write_tree(BNODE * P, char *filename)
 
 void write_tree_binary(BNODE * P, char *filename)
 {
+	fprintf(stderr, "write_tree_binary stub bnode %d, filename %s\n", bnode_length(P), filename);
+	return ;
+
 	printf("You are attempting to write_tree_binary to %s, unsuccessfully! treelength %d\n", filename, bnode_count(P));
 	fprintf(stderr, "You are attempting to write_tree_binary %s, unsuccessfully! treelength %d\n", filename, bnode_count(P));
 	exit(1);
@@ -2025,18 +2227,46 @@ void write_dmx(double **dmx, char *filename)
 	fclose(fp);
 }
 
-char *scorematrixfile = NULL;
-char *oprefix = NULL;
-char *alnfile = NULL;
-char *jsnfile = NULL;
-char *dmxfile = NULL;
-char *treefile = NULL;
+BNODE *bnode_distance_tree(int n, double **dmx)
+/*
+*/
+{
+	int *index = int_vector_ramp(n);
+	BNODE *P = bnode_tree_dmx(n, index, dmx);
+	return(P);
+}
 
+BNODE *bnode_recursive_embed(int n, double **dmx)
+/* After
+// 1. alignments have now provided a distance matrix
+// The the task of tree building can begin
+// 2. embed distance matrix into orthogonal coordinates,
+// 3. build binary tree based on nearest neighbor-joining algorithm.
+// 4. recursively visit each sub-branch and redo embed+tree (steps 2 and 3).
+// Garry Paul Gippert.
+*/
+{
+	int dim = p_dim;
+	double **pos = embed_dmx(n, dmx);
+	int *index = int_vector_ramp(n);
+	BNODE *P = bnode_tree(pos, index, n, dim);
+	/* This must be Tree0 */
+	write_tree(P, tree0file);
+	if (p_e == 'F') {
+		fprintf(stderr, "Full recursive embed/cluster\n");
+		P->left = bnode_reembed(P->left, 'L', dmx, n, dim);
+		P->right = bnode_reembed(P->right, 'R', dmx, n, dim);
+	}
+	else {
+		fprintf(stderr, "Single pass embed/cluster\n");
+	}
+	int_vector_free(n, index);
+	return P;
+}
 
 #define COMMAND_LINE_HELP "\n\n\
-ACLUST  Computes pairwise alignments, a distance matrix, and a phylogenetic tree from\n\
-protein FASTA input files. Input sequences may be pre-aligned, representing a multiple alignment.\n\
-Otherwise sequence alignments are computed on the fly.\n\
+ACLUST  Generates pairwise alignments, distance matrix and phylogenetic tree from protein FASTA input files.\n\
+Input entries may be pre-aligned, for example Fasta format output produced by MAFFT, or unaligned.\n\
 \n\
 Optional parameters:\n\
 	-s <input_scorematrix_file>	possibly '$BIA/dat/BLOSUM62.txt'\n\
@@ -2138,7 +2368,6 @@ void output_initialization()
 	if (!oprefix)
 		oprefix = char_string("this");
 	fprintf(stderr, "oprefix initialized to %s\n", oprefix);
-
 	if (!alnfile) {
 		alnfile = char_vector(strlen(oprefix) + strlen(".aln.txt") + 1);
 		sprintf(alnfile, "%s%s", oprefix, ".aln.txt");
@@ -2146,7 +2375,6 @@ void output_initialization()
 	fprintf(stderr, "alnfile %s\n", alnfile);
 	if ((alnfp = fopen(alnfile, "w")) == NULL)
 		fprintf(stderr, "Unable to open aln file %s for writing\n", alnfile), exit(1);
-
 	/* optional write JSON text */
 	if (p_json) {
 		if (!jsnfile) {
@@ -2157,19 +2385,26 @@ void output_initialization()
 		if ((jsnfp = fopen(jsnfile, "w")) == NULL)
 			fprintf(stderr, "Unable to open JSON file %s for writing\n", jsnfile), exit(1);
 	}
-
 	if (!dmxfile) {
 		dmxfile = char_vector(strlen(oprefix) + strlen(".dmx.txt") + 1);
 		sprintf(dmxfile, "%s%s", oprefix, ".dmx.txt");
 	}
 	fprintf(stderr, "dmxfile %s\n", dmxfile);
-
+	if (!dreefile) {
+		dreefile = char_vector(strlen(oprefix) + strlen(".dree.txt") + 1);
+		sprintf(dreefile, "%s%s", oprefix, ".dree.txt");
+	}
+	fprintf(stderr, "dreefile %s\n", dreefile);
 	if (!treefile) {
 		treefile = char_vector(strlen(oprefix) + strlen(".tree.txt") + 1);
 		sprintf(treefile, "%s%s", oprefix, ".tree.txt");
 	}
 	fprintf(stderr, "treefile %s\n", treefile);
-
+	if (!tree0file) {
+		tree0file = char_vector(strlen(oprefix) + strlen(".tree0.txt") + 1);
+		sprintf(tree0file, "%s%s", oprefix, ".tree0.txt");
+	}
+	fprintf(stderr, "tree0file %s\n", tree0file);
 	/* Here is where we initialize additional output files with a standard prefix */
 }
 
@@ -2215,6 +2450,10 @@ int main(int argc, char *argv[])
 	double **dmx = align_fasta();
 
 	write_dmx(dmx, dmxfile);
+
+	BNODE *dree = bnode_distance_tree(g_nent, dmx);
+
+	write_tree(dree, dreefile);
 
 	BNODE *tree = bnode_recursive_embed(g_nent, dmx);
 
