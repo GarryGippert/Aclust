@@ -14,20 +14,23 @@ Output Newick file (**_tree.txt**) *output files do share a common prefix
 
 MANUSCRIPT IN PREPARATION
 
-1. For each pair of input sequences, a distance is computed using a modified version of ScoreDist (Sohnhammer & Hollich, 2005). Input sequences may represent a multiple alignment, OR, if the input sequences are unaligned, pairwise protein sequence alignments are computed using a local alignment algorithm (Smith & Waterman, 1981) with affine gap penalties. Alignment scores are computed using Blosum62 (Henikoff & Henikoff, 1992) amino-acid substitution scores in either case.
+1. For each pair of input sequences I and J, a distance DsubI,J is computed using a renormalized version of ScoreDist (Sohnhammer & Hollich, 2005). By default, alignments are computed using a local alignment algorithm (Smith & Waterman, 1981), affine gap penalties, and Blosum62 (Henikoff & Henikoff, 1992) amino-acid substitution scores. Input an MSA Fasta file (-m flag) and inferred pairwise alignment scores and derived distances are computed using the same method. <i>Scoredist normalization is part of the subject material in the coming paper.</i> The distance matrix is written to (shared_prefix implied) **_dmx.txt**.
 
-2. The distance matrix is embedded into orthogonal coordinates using metric matrix distance geometry (Crippen & Havel, 1988). Each sequence is represented by a point in this space <i>(x,y,z,w0,w1,w2,...)</i>.
+2. The distance matrix is embedded into orthogonal coordinates using metric matrix distance geometry (Crippen & Havel, 1988). Each sequence is represented by a point in this space <i>(x,y,z,....) or (w0,w1,w2,...,wM-1), for dimension M usually 20</i>.
+   
+(2a). A distance-space nearest-neighbor joining tree is constructed from the initial distance matrix and written to **_dree.txt**. Branch lengths to parent are computed using weighted branch counts.
+'''
 
-3. A nearest-neighbor joining algorithm in orthogonal coordinate space is used to compute a tree. In this algorithm, sequence points are leaf nodes. Thereafter, the two nearest leaf or internal nodes are replaced by one node at their weighted average position, and the process repeated until a single (the root) node remains.
+3. A nearest-neighbor joining algorithm in orthogonal coordinate space is used to compute a tree. In this algorithm, sequence points are leaf nodes. Thereafter, the two nearest leaf or internal nodes are replaced by one node at their weighted average position, and the process repeated until a single (the root) node remains.  The initial embed tree is written to **_tree0.txt**.
 
-4. Starting with the initial root node, trees for left- and right sub-branches are recomputed independently, considering only the subset of points they hold. This process - repeated recursively until the entire tree has been traversed - is computationally expensive, but improves the tree topology by gradually shedding deleterious effects introduced by non-metric distances arising predominantly from (often many) low-homology comparisons within the input sequence pool.
+4. Tree refinement. Starting with the initial root node, trees for left- and right sub-branches are recomputed independently, considering only the subset of points they hold. This process is repeated recursively until the entire tree has been traversed, a computationally expensive refinement. the tree topology by gradually shedding deleterious effects introduced by non-metric distances arising predominantly from (often many) low-homology comparisons within the input sequence pool.
 
 ### Program Author
-Garry Paul Gippert, Bioengineering, Danish Technical University, Lyngby, Sealand, Denmark. Please contact me with suggestions or questions.
+Garry Paul Gippert, Bioengineering, Danish Technical University, Lyngby, Sealand, Denmark. Please contact me with suggestions or questions. Aclust was developed for and with a bunch of the world's great colleagues, starting way back in 2007.
 
 ### Provenance and Licensing
-Key software and conceptual elements used in Aclust were developed by Garry Paul Gippert while employed at Novozymes A/S, Denmark. The software was kindly relicensed by Novozymes A/S back to Garry Paul Gippert, in Jan 2022, under conditions that it not be commercialized. The text of that agreement is reproduced here:
-<pre>LICENSE.txt 
+Key software and conceptual elements used in Aclust were developed by Garry Paul Gippert while employed at Novozymes A/S, Denmark. The software was kindly relicensed by Novozymes A/S back to Garry Paul Gippert, in Jan 2022, with the licencing text given below. The current Aclust repository contains a cherry-picked and shrink-wrapped selection from that material, therefore the same licensing conditions are likely to apply here.
+<pre>**LICENSE.txt** 
 Copyright 2022 Novozymes A/S
 
 This license covers all content within the provide data 
@@ -61,7 +64,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 </pre>
 
-To the extent it does not conflict with the above conditions, Aclust is made available under GNU General Public License v3.0. Date of this GitHub repository Nov 2023.
+The spelling mistake is not mine. To the extent it does not conflict with the above conditions Aclust is made available here under GNU General Public License v3.0. Date of this GitHub repository Nov 2023.
 
 ### References
 
