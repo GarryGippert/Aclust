@@ -1,16 +1,39 @@
 # Program: Aclust
 (Alignment and clustering of protein sequences)
 
-The program generate a phylogenetic tree from Fasta protein sequence input.
+The single C-language source program aclust.c generates phylogenetic trees from Fasta protein sequence input.
 
-Input Fasta file
+Garry Paul Gippert, MANUSCRIPT IN PREPARATION
+
+Briefly:
+
+- A matrix of pairwise distances is computed from sequence alignments.
+
+- A binary tree is computed directly from the distance matrix, using NNJ (Nearest Neighor Joining) and weighted distance averaging when computing branche lengths.
+
+- A second binary tree is computed also using NNJ, but in the space of orthogonal coordinate obtained by eigenvalue decomposition of the metric (derived from distance) matrix.
+
+- Recursive sub-branch reembedding refines topology and branch lengths, but (drawback) freezes early tree left-right subdivisions.
+
+Make the program:
+'''cd src; make; make install'''
+
+Run the program:
+'''bin/aclust -s dat/BLOSUM62.dat my.fa'''
+
+#### Input and output files
+Input Fasta
 - Sequences may be pre-aligned (MSA). Otherwise local (SW) alignments are computed.
 
-Output Newick file (**_tree.txt**) *output files do share a common prefix
-- Derived or computed pairwise alignments are written to local files (**_aln.txt** and/or **_aln.js**) enriched with scoredist values.
-- Derived distance matrix is written to local file (**_dmx.txt**).
+Output Newick trees, alignments, and distance matrix (sharing a common prefix)
+- _aln.txt- Alignments (text)
+- _aln.js - Alignments (JSON-parsable text)
+- _dmx.txt - Distance Matrix (text)
+- **_dree.txt** - Distance Matrix tree (newick)
+- **_tree0.txt** - Initial Embed tree (newick)
+- **_tree.txt** - Refined Embed tree (newick)
 .
-### Brief introduction
+### Bit longer introduction
 
 MANUSCRIPT IN PREPARATION
 
