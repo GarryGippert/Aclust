@@ -26,18 +26,56 @@ sequences sharing low homology.
 Input file(s) contain protein sequences in Fasta format.
 
 Output files produced: (all with shared prefix)
-        prefix_aln.js   JSON-parsable details of each pairwise alignment
-        prefix_dmx.txt  Distance matrix in plain text format <labelI> <labelJ> <distanceIJ>
-        prefix_tree.txt Newick-format tree
+        prefix_aln.txt  Text (somewhat human readable) alignments, useful in trouble-shooting.
+        prefix_aln.js   JSON-parsable details of each pairwise alignment, useful to parse later.
+        prefix_dmx.txt  Distance matrix in plain text format <labelI> <labelJ> <distanceIJ>.  not needed.
+	prefix_dree.txt	Distance matrix NNJ tree, Newick format.
+        prefix_tree0.txt Metric matrix embed tree, Newick-format.
+        prefix_tree.txt Recursively refined embed tree, Newick-format.
 
 ACLUST was developed and written by Garry Paul Gippert, and packaged as a single C source file in 2023.
 
-ACLUST is made available with a GNU General Public License v3.0, and may be used, modified and distributed
-freely as long as license and copyleft notices are preserved.
-*/
-/* ACLUST
+Copyright 2022 Novozymes A/S
 
-Additional notes:
+This license covers all content within the provide data 
+package, that originates from Novozymes A/S and delivered as 
+'Garry-Paul-Gippert_data-extract_1.tar.gz' on 31.01.2022. 
+Other content within the package that e.g. is obtained from 
+external sources, collaborators or public sources is not 
+covered but should respect all license restrictions that may 
+be associated. 
+
+Permission is hereby granted, free of charge, to any person 
+obtaining a copy of this software and associated documentation 
+files (the "Software") to utilize, copy, modify, merge, 
+distribute and to permit persons to whom the Software is 
+furnished to do so, subject to the following conditions:
+
+THE CONTENT CANNOT BE INTEGRATED OR SOLD FOR COMMERCIAL USE IN 
+ANY FORM. ALL MATERIAL WITHIN THIS DATA PACKAGE ORIGINATING 
+FROM NOVOZYMES A/S IS FOR NON-COMMCERIAL USE ONLY.
+
+The above copyright notice and this permission notice shall be 
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES 
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT 
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
+DEALINGS IN THE SOFTWARE.
+
+ACLUST is made available online at GitHub GarryGippert:Aclust
+(https://github.com/GarryGippert/Aclust) with a GNU General Public
+License v3.0, and may be used, modified and distributed according
+to the principles therein, as long as the above license text from
+Novozymes is adhered to, and is preserved and distributed within all
+copies of this code and derivative works. Signed,
+Garry Paul Gippert Nov 23, 2023
+*/
+/* ACLUST Additional notes:
 
 The gap affine penalty used here allows a gap 'cross over' with no additional gap-open penalty.  A
 cross-over gap starts in one alignment string and ends in the other alignment string, with no
@@ -513,7 +551,7 @@ void read_scorematrix(char *filename)
 
 /* global variables for input sources and fasta entries */
 int g_nent = 0, g_nsrc = 0;
-#define MAXENTRIES 3000
+#define MAXENTRIES 10000
 char *facc[MAXENTRIES];
 char *fseq[MAXENTRIES];
 int fsrc[MAXENTRIES];		/* source fasta file names, worst case one sequence per file */
@@ -544,8 +582,10 @@ void read_fasta(char *filename)
 	strcpy(seq, "");
 	while (fgets(line, sizeof(line), fp) != NULL) {
 		lineno++;
-		if (sscanf(line, "%[^\n]", text) != 1)
-			fprintf(stderr, "Cannot sscanf %%[^\n]:%s\n", line), exit(1);
+		if (sscanf(line, "%[^\n]", text) != 1) {
+			fprintf(stderr, "Cannot sscanf %%[^\n]:%s\n", line);
+			continue;
+		}
 		/* skip comments */
 		if (text[0] == '#')
 			continue;
@@ -2271,6 +2311,7 @@ Input entries may be pre-aligned, for example Fasta format output produced by MA
 Optional parameters:\n\
 	-s <input_scorematrix_file>	possibly '$BIA/dat/BLOSUM62.txt'\n\
 	-p <output_prefix>		<first_input_filename_including_dotfa>\n\
+	-d <integer>>			embed dimension (default 20)\n\
 \n\
 Optional flags:\n\
 	-m 	activates	M.ultiple alignment mode\n\
@@ -2279,10 +2320,12 @@ Optional flags:\n\
 	-nonself	activates	Non-self, therefore only show off-diagonal alignments\n\
 \n\
 Output files share a prefix <p>, which is default name of first fasta input file\n\
-	<p>.aln.txt	alignments, text\n\
-	<p>.aln.js	alignments individual JSON rows (optional, activate using -j) \n\
-	<p>.dmx.txt	distance matrix, text\n\
-	<p>.tree.txt	Newick-format phylogenetic tree, text\n\
+	<p>_aln.txt	alignments, text\n\
+	<p>_aln.js	alignments individual JSON rows (optional, activate using -j) \n\
+	<p>_dmx.txt	distance matrix, text\n\
+	<p>_dree.txt	distance matrix tree, newick text\n\
+	<p>_tree0.txt	initial embed tree, newick text\n\
+	<p>_tree.txt	refined embed tree, newick text\n\
 \n\
 DETAILS: Score distance matrix based on pairwise local sequence\n\
 alignments (Smith & Waterman) OR multiple alignment given in input\n\
@@ -2291,7 +2334,7 @@ to the shorter sequence length.  Tree computed from distance matrix\n\
 by embedding into orthogonal coordinates (metric matrix distance\n\
 geometry) and nearest-neighbor joining. Tree refined by re-embedding\n\
 and neighbor-joining points in each sub-branch independently, and\n\
-recursively.\n\
+recursively. A pure distance NNJ tree is computed also.\n\
 \n\
 AUTHOR: Garry Paul Gippert, GarryG@dtu.dk, DTU Bioengineering\n\
 "
@@ -2327,6 +2370,15 @@ int pparse(int argc, char *argv[])
 				parameter_value_missing(c, argc, argv);
 			oprefix = char_string(argv[c++]);
 			fprintf(stderr, "output prefix set to '%s'\n", oprefix);
+		}
+		else if (strncmp(argv[c], "-d", 2) == 0) {
+			if (++c == argc)
+				parameter_value_missing(c, argc, argv);
+			if (sscanf(argv[c], "%d", &p_dim) == 1)
+				fprintf(stderr, "dimension set to %d\n", p_dim);
+			else
+				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
+			c++;
 		}
 		else if (strncmp(argv[c], "-nonself", 8) == 0) {
 			++c;
