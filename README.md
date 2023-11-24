@@ -72,11 +72,11 @@ To understand and explore:
 
 The Metric Matrix Distance Geometry algorithm at the heart of this work was brought into this field out of curiosity. With this algorithm the question 'What does **sequence space** look like?' turned into 'What about embedding a distance matrix derived from pairwise alignments and put it up in 3D?' and from there to 'How to generate Phylogenetic trees automatically?'.
 
-Key drawbacks of the embedding procedure in a nutshell:
-
+Key drawbacks:
 - Compute resources needed to generate sequence alignments.
-  
-- Branch distortion and neighbor 'trapping'. <i>Large matrix values dominate the first eigenvectors, preventing correct 'unfurling' of higher-dimensional details - crumpling local tree topology - until one reaches a sufficient level of matrix exhaustion. To make matters worse, large distances are both the least accurate, and the most abundant (most randomly-selected protein pairs are unrelated, but still might return an 'alignment'). A computationally expensive, recursive refinement procedure described below ameliorates branch crumpling, but does not solve left-right point division freeze that may place potential partners on opposite sides of a parent node early in the calculation. The latter behaviour has been observed when the sequence pool contains both full-length and short fractional-length proteins.)</i>
+- Branch distortion and neighbor 'trapping'. <i>Large matrix values dominate the first eigenvectors, preventing correct 'unfurling' of higher-dimensional details - crumpling local tree topology - until one reaches a sufficient level of matrix exhaustion. To make matters worse, large distances are both the least accurate, and the most abundant (most randomly-selected protein pairs are unrelated, but still might return an 'alignment'). A computationally expensive, recursive refinement procedure described below ameliorates branch crumpling, but does not solve left-right branch point subdivisions that may place potential partners on opposite sides of a parent node early in the calculation. The latter behaviour has been observed when the sequence pool contains both full-length and short fractional-length proteins.)</i>
+- Sequence length limits. Around 10k AA. Most individual biological protein sequences are shorter than 1000 to 2000 amino acid range. Program editing and compilation may be necessary.
+- Sequence count limits. Around 10k sequences. The cost of the algorithm is usually great enough that this limit is sufficient.
 
 ### Program Author
 Garry Paul Gippert, Bioengineering, Danish Technical University, Lyngby, Sealand, Denmark. Please contact me with suggestions or questions. Aclust was developed for and with a bunch of the world's great colleagues, starting way back in 2007.
