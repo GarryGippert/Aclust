@@ -3,7 +3,7 @@
 
 Contents: A single C-language source program **aclust.c** that generates phylogenetic trees from Fasta protein sequence input.
 
-Garry Paul Gippert, MANUSCRIPT IN PREPARATION
+Garry Paul Gippert, Bioengineering, Danish Technical University, Lyngby, Denmark. MANUSCRIPT IN PREPARATION
 
 Briefly:
 
