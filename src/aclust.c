@@ -1873,6 +1873,18 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 				}
 			}
 		}
+		else
+		if (dmx_flag & DMX_TWO) {
+			/* Average leaf-to-leaf across branches distance model */
+			fprintf(stderr, "DMX_TWO not implemented yet\n"); exit(1);
+			double del;
+			for (i = 0; i < m; i++) {
+				if (avail[i]) {
+					del = (smx[i][mini] + smx[i][minj]) / 2.0;
+					smx[i][m] = smx[m][i] = del;
+				}
+			}
+		}
 		else {
 			printf("dmx_flag value %d apparently not coded\n", dmx_flag);
 			fprintf(stderr, "dmx_flag value %d apparently not coded\n", dmx_flag);
