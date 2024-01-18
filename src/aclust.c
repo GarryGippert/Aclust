@@ -5,6 +5,10 @@ Aclust generates a phylogenetic tree from FASTA input.
 Please contact the author Garry Paul Gippert, GarryG@dtu.dk, DTU Bioengineering,
 Danish Technical University, with questions or for more information.
 
+Distance-matrix approach.
+
+NNJ in distance space, and embedded coordinate space.
+
 1. For each pair of input sequences, a distance is computed using a modified version of ScoreDist
 (Sohnhammer & Hollich, 2005). Input sequences may represent a multiple alignment, OR, if the input
 sequences are unaligned, pairwise protein sequence alignments are computed using a local alignment
@@ -143,6 +147,7 @@ ACLUST was developed and written by Garry Paul Gippert, and packaged as a single
 #define ALIGN_PAD	0x0002	/* enable PAD */
 #define ALIGN_CROSS	0x0004	/* enable gap cross-over */
 #define ALIGN_BODY	0x0008	/* enable gap body-gaps (not recommended) */
+
 
 #define	EPSILON		1.0e-8
 #define NEARZERO(a)	(fabs(a) < 10.0*EPSILON ? 0.0 : (a))
@@ -1706,10 +1711,35 @@ void bnode_bnodei(BNODE * B, BNODE ** bnode, int *i)
 		fprintf(stderr, "bnode_bnodei: B->left xor B->right in bnode_bnodei\n"), exit(1);
 }
 
+#define DMX_ONE		0x00000001  /* == 1 */
+#define DMX_TWO		0x00000002  /* == 2 */
+#define DMX_THREE	0x00000004  /* == 4 */
+#define DMX_FOUR	0x00000008  /* == 8 */
+#define DMX_FIVE	0x00000010  /* == 16 */
+#define DMX_SIX		0x00000020  /* == 32 */
+#define DMX_SEVEN	0x00000040  /* == 64 */
+
+
 /* provide a binary tree from a DISTANCE matrix using nearest-neighbor joining algorithm and DISTANCE averaging (yuck) */
-BNODE *bnode_tree_dmx(int n, int *index, double **dmx)
+/* dmx_flag should control distance calculation at nnj/node creation */
+BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 /* BNODE *bnode_tree_dmx(double **pos, int *index, int n, int dim) */
 {
+
+	if (dmx_flag & DMX_ONE) { printf("DMX ONE\n"), exit(0); }
+	else
+	if (dmx_flag & DMX_TWO) { printf("DMX TWO\n"), exit(0); }
+	else
+	if (dmx_flag & DMX_THREE) { printf("DMX THREE\n"), exit(0); }
+	else
+	if (dmx_flag & DMX_FOUR) { printf("DMX FOUR\n"), exit(0); }
+	else
+	if (dmx_flag & DMX_FIVE) { printf("DMX FIVE\n"), exit(0); }
+	else
+	if (dmx_flag & DMX_SIX) { printf("DMX SIX\n"), exit(0); }
+	else
+	if (dmx_flag & DMX_SEVEN) { printf("DMX SEVEN\n"), exit(0); }
+	else { printf("DMX NONE of the above\n"), exit(1); }
 
 	/* algorithm: // allocate BNODE vector of length 2N-1, with N of them with 'natural' index numbers (leaf nodes)
 	   // and N-1 of them with index number -1 (tree nodes) without assigning any of them parentage. // allocate
@@ -1833,13 +1863,20 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx)
 		avail[mini] = 0;
 		avail[minj] = 0;
 
-		/* Average distance model */
-		double del;
-		for (i = 0; i < m; i++) {
-			if (avail[i]) {
-				del = (smx[i][mini] + smx[i][minj]) / 2.0;
-				smx[i][m] = smx[m][i] = del;
+		if (dmx_flag & DMX_ONE) {
+			/* Average distance model */
+			double del;
+			for (i = 0; i < m; i++) {
+				if (avail[i]) {
+					del = (smx[i][mini] + smx[i][minj]) / 2.0;
+					smx[i][m] = smx[m][i] = del;
+				}
 			}
+		}
+		else {
+			printf("dmx_flag value %d apparently not coded\n", dmx_flag);
+			fprintf(stderr, "dmx_flag value %d apparently not coded\n", dmx_flag);
+			exit(1);
 		}
 
 		/* register availability and increment to next available node */
@@ -2272,7 +2309,8 @@ BNODE *bnode_distance_tree(int n, double **dmx)
 */
 {
 	int *index = int_vector_ramp(n);
-	BNODE *P = bnode_tree_dmx(n, index, dmx);
+	int dmx_flag = 0;
+	BNODE *P = bnode_tree_dmx(n, index, dmx, dmx_flag);
 	return(P);
 }
 
