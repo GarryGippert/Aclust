@@ -1726,7 +1726,7 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 /* BNODE *bnode_tree_dmx(double **pos, int *index, int n, int dim) */
 {
 
-	if (dmx_flag & DMX_ONE) { printf("DMX ONE\n"), exit(0); }
+	if (dmx_flag & DMX_ONE) { fprintf(stderr, "DMX ONE is coded\n");
 	else
 	if (dmx_flag & DMX_TWO) { printf("DMX TWO\n"), exit(0); }
 	else
@@ -2279,6 +2279,7 @@ void write_tree(BNODE * P, char *filename)
 	bnode_print(fp, P);
 	int n = bnode_count(P);
 	fprintf(stderr, "Tree file %s with %d nodes written\n", filename, n);
+	fclose(fp);
 }
 
 void write_tree_binary(BNODE * P, char *filename)
@@ -2309,7 +2310,7 @@ BNODE *bnode_distance_tree(int n, double **dmx)
 */
 {
 	int *index = int_vector_ramp(n);
-	int dmx_flag = 0;
+	int dmx_flag = DMX_ONE;
 	BNODE *P = bnode_tree_dmx(n, index, dmx, dmx_flag);
 	return(P);
 }
