@@ -1726,7 +1726,7 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 /* BNODE *bnode_tree_dmx(double **pos, int *index, int n, int dim) */
 {
 
-	if (dmx_flag & DMX_ONE) { fprintf(stderr, "DMX ONE is coded\n");
+	if (dmx_flag & DMX_ONE) { fprintf(stderr, "DMX ONE is coded\n"); }
 	else
 	if (dmx_flag & DMX_TWO) { printf("DMX TWO\n"), exit(0); }
 	else
