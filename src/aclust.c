@@ -164,9 +164,6 @@ char *oprefix = NULL;
 char *alnfile = NULL;
 char *jsnfile = NULL;
 char *dmxfile = NULL;
-char *dreefile = NULL;
-char *treefile = NULL;
-char *tree0file = NULL;
 
 void j_osb(FILE * fp)
 /* output jsonified open square bracket */
@@ -1220,7 +1217,6 @@ double pair_align(int fi, int fj)
 	return (d);
 }
 
-
 double **align_fasta()
 /* return all-vs-all pairwise distance matrix from multiple alignment or computed pairwise alignments
 // return a symmetric matrix containing align scoredistance normalized
@@ -1237,6 +1233,7 @@ double **align_fasta()
 /* EMBED */
 
 int p_dim = 20;			/* embed dimension: default 20 */
+char p_e = 'F';			/* 'D' = distance only, 'S' = single only, 'F' = full recursive embed */
 int p_ilim = 1000;		/* embed iteration limit: default 1000 */
 double p_clim = 1.0e-12;	/* embed polynomial convergence limit, default 1e-12 */
 
@@ -1391,7 +1388,6 @@ double **embed_dmx(int n, double **d)
 /* TREE */
 
 char p_r = 'N';			/* tree branch rotation: 'N' none, 'R' right, 'L' left */
-char p_e = 'F';			/* recursive reembed: 'F' full, 'S' single */
 
 #define MAXPOINTS MAXENTRIES
 #define MAXNODES (2 * MAXPOINTS - 1)	/* total number of nodes required for binary tree */
@@ -1723,7 +1719,6 @@ void bnode_bnodei(BNODE * B, BNODE ** bnode, int *i)
 /* provide a binary tree from a DISTANCE matrix using nearest-neighbor joining algorithm and DISTANCE averaging (yuck) */
 /* dmx_flag should control distance calculation at nnj/node creation */
 BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
-/* BNODE *bnode_tree_dmx(double **pos, int *index, int n, int dim) */
 {
 
 	if (dmx_flag & DMX_ONE) { fprintf(stderr, "DMX ONE is coded\n"); }
@@ -2318,16 +2313,12 @@ void write_dmx(double **dmx, char *filename)
 }
 
 BNODE *bnode_distance_tree(int n, double **dmx)
-/*
-*/
 {
 	int *index = int_vector_ramp(n);
 	int dmx_flag = DMX_ONE;
 	BNODE *P = bnode_tree_dmx(n, index, dmx, dmx_flag);
 	return(P);
 }
-
-BNODE *bnode_recursive_embed(int n, double **dmx)
 /* After
 // 1. alignments have now provided a distance matrix
 // The the task of tree building can begin
@@ -2336,21 +2327,12 @@ BNODE *bnode_recursive_embed(int n, double **dmx)
 // 4. recursively visit each sub-branch and redo embed+tree (steps 2 and 3).
 // Garry Paul Gippert.
 */
+
+BNODE *bnode_embed_tree(int n, double **dmx)
 {
-	int dim = p_dim;
 	double **pos = embed_dmx(n, dmx);
 	int *index = int_vector_ramp(n);
-	BNODE *P = bnode_tree(pos, index, n, dim);
-	/* This must be Tree0 */
-	write_tree(P, tree0file);
-	if (p_e == 'F') {
-		fprintf(stderr, "Full recursive embed/cluster\n");
-		P->left = bnode_reembed(P->left, 'L', dmx, n, dim);
-		P->right = bnode_reembed(P->right, 'R', dmx, n, dim);
-	}
-	else {
-		fprintf(stderr, "Single pass embed/cluster\n");
-	}
+	BNODE *P = bnode_tree(pos, index, n, p_dim);
 	int_vector_free(n, index);
 	return P;
 }
@@ -2364,6 +2346,7 @@ Required parameters:\n\
 Optional parameters:\n\
 	-p <string>		prefix for all output files (default=name of first input fasta file)\n\
 	-d <integer>		embed dimension (default 20)\n\
+	-e <char>		(D) distance tree only, (S) distance+single embed trees, (F, default) distance+single+full embed trees\n\
 Optional flags:\n\
 	-m 			activates to interpret input Fasta as MSA\n\
 Less important flags:\n\
@@ -2377,8 +2360,8 @@ Output files share a prefix <p>, which is default name of first fasta input file
 	<p>_aln.js	alignments individual JSON rows (optional, activate using -j) \n\
 	<p>_dmx.txt	distance matrix, text\n\
 	<p>_dree.txt	distance matrix tree, newick text\n\
-	<p>_tree0.txt	initial embed tree, newick text\n\
-	<p>_tree.txt	refined embed tree, newick text\n\
+	<p>_tree0.txt	single embed tree, newick text\n\
+	<p>_tree.txt	fulfull embed tree, newick text\n\
 \n\
 DETAILS: Score distance matrix based on pairwise local sequence\n\
 alignments (Smith & Waterman) OR multiple alignment given in input\n\
@@ -2433,6 +2416,15 @@ int pparse(int argc, char *argv[])
 				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
 			c++;
 		}
+		else if (strncmp(argv[c], "-e", 2) == 0) {
+			if (++c == argc)
+				parameter_value_missing(c, argc, argv);
+			if (sscanf(argv[c], "%c", &p_e) == 1)
+				fprintf(stderr, "Embed set to %d\n", p_e);
+			else
+				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
+			c++;
+		}
 		else if (strncmp(argv[c], "-nonself", 8) == 0) {
 			++c;
 			p_nonself = (p_nonself + 1) % 2;
@@ -2462,7 +2454,11 @@ int pparse(int argc, char *argv[])
 			fprintf(stderr, "assume termination of parameter stream\n");
 			break;
 		}
+
 	}
+	/* some validation */
+	if (strchr("DSF", p_e) == NULL)
+		fprintf(stderr, "Parameter -e %c invalid, must be D, S or F\n", p_e), exit(1);
 	fprintf(stderr, "pparse returns %d\n", c);
 	return (c);
 }
@@ -2495,21 +2491,6 @@ void output_initialization()
 		sprintf(dmxfile, "%s%s", oprefix, ".dmx.txt");
 	}
 	fprintf(stderr, "dmxfile %s\n", dmxfile);
-	if (!dreefile) {
-		dreefile = char_vector(strlen(oprefix) + strlen(".dree.txt") + 1);
-		sprintf(dreefile, "%s%s", oprefix, ".dree.txt");
-	}
-	fprintf(stderr, "dreefile %s\n", dreefile);
-	if (!treefile) {
-		treefile = char_vector(strlen(oprefix) + strlen(".tree.txt") + 1);
-		sprintf(treefile, "%s%s", oprefix, ".tree.txt");
-	}
-	fprintf(stderr, "treefile %s\n", treefile);
-	if (!tree0file) {
-		tree0file = char_vector(strlen(oprefix) + strlen(".tree0.txt") + 1);
-		sprintf(tree0file, "%s%s", oprefix, ".tree0.txt");
-	}
-	fprintf(stderr, "tree0file %s\n", tree0file);
 	/* Here is where we initialize additional output files with a standard prefix */
 }
 
@@ -2534,6 +2515,7 @@ void explain_input_better(int argc, char *argv[], int cstart)
 
 int main(int argc, char *argv[])
 {
+	char *treefile = NULL;
 	int c = pparse(argc, argv);
 	if (c == 1)
 		explain_input_better(argc, argv, c);
@@ -2556,16 +2538,39 @@ int main(int argc, char *argv[])
 
 	write_dmx(dmx, dmxfile);
 
+	/* Construct tree based on distance matrix alone.
+	*/
 	BNODE *dree = bnode_distance_tree(g_nent, dmx);
+	treefile = char_vector(strlen(oprefix) + strlen(".dree.txt") + 1);
+	sprintf(treefile, "%s%s", oprefix, ".dree.txt");
+	fprintf(stderr, "Distance tree %s\n", treefile);
+	write_tree(dree, treefile);
+	free(treefile);
+	if (p_e == 'D')
+		fprintf(stderr, "Halt after distance tree\n"), exit(0);
 
-	write_tree(dree, dreefile);
-
-	BNODE *tree = bnode_recursive_embed(g_nent, dmx);
-
+	/* Construct tree based on single pass embedding.
+	*/
+	BNODE *tree = bnode_embed_tree(g_nent, dmx);
+	treefile = char_vector(strlen(oprefix) + strlen(".tree0.txt") + 1);
+	sprintf(treefile, "%s%s", oprefix, ".tree0.txt");
+	fprintf(stderr, "Single embed tree %s\n", treefile);
 	write_tree(tree, treefile);
+	free(treefile);
+	if (p_e == 'S')
+		fprintf(stderr, "Halt after single embed tree\n"), exit(0);
+
+	/* Continue with full recursive embedding.
+	*/
+	tree->left = bnode_reembed(tree->left, 'L', dmx, g_nent, p_dim);
+	tree->right = bnode_reembed(tree->right, 'R', dmx, g_nent, p_dim);
+	treefile = char_vector(strlen(oprefix) + strlen(".tree.txt") + 1);
+	sprintf(treefile, "%s%s", oprefix, ".tree.txt");
+	fprintf(stderr, "Full recursive embed tree %s\n", treefile);
+	write_tree(tree, treefile);
+	free(treefile);
 
 	char *binary_treefile = char_string("binary_treefile.btf");
-
 	write_tree_binary(tree, binary_treefile);
 
 	exit(0);
