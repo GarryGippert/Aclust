@@ -2513,28 +2513,65 @@ void explain_input_better(int argc, char *argv[], int cstart)
 	double **dmx = read_dmx(f_dmxfilename);
 */
 
+int facc_index(char *word)
+{
+	int i; for (i = 0; i < g_nent; i++) if (strcmp(facc[i], word)==0) return i;
+	return -1;
+}
+
 double **read_dmx(char *filename)
 {
 /* remember MAXENTRIES 10000
 	int g_nent = 0;
 	char *facc[MAXENTRIES];
 */
+	g_nent = 0;
 	char line[MAXLINELEN], word1[MAXWORDLEN], word2[MAXWORDLEN];
 	float value;
+	int index1, index2;
 	FILE *fp = fopen(filename, "r");
 	if (!fp) fprintf(stderr, "Could not open filename %s r mode\n", filename), exit(1);
-	int nent = 0;
 	while (fgets(line, sizeof(line), fp) != NULL)
 	{
 		if (strlen(line) == 0 || line[0] == '#')
 			continue;
 		if (sscanf(line, "%s %s %f", word1, word2, &value) != 3)
 			fprintf(stderr, "Could not sscanf word1, word2, value line >>%s<<\n", line), exit(1);
-		printf("word1 %s word2 %s value %g\n", word1, word2, value);
+		while((index1 = facc_index(word1)) < 0)
+			facc[g_nent++] = char_string(word1);
+		while((index2 = facc_index(word2)) < 0)
+			facc[g_nent++] = char_string(word2);
+		/* fprintf(stderr, "g_nent %d word1 %s index %d word2 %s index %d value %g\n", g_nent, word1, facc_index(word1), word2, facc_index(word2), value); */
 	}
-	fprintf(stderr, "All ok\n"), exit(0);
-	return NULL;
+	fclose(fp);
 
+	/* that was a very fast way to allocate the labels and dimension the space */
+	double **dmx = double_matrix(g_nent, g_nent);
+	int i, j;
+	for (i = 0; i < g_nent; i++)
+		for (j = i;  j < g_nent; j++)
+			dmx[i][j] = dmx[j][i] = -99.0;
+
+	/* Reopen the file and rescan the data. Simply faster than recording it the first time */
+	fp = fopen(filename, "r");
+	if (!fp) fprintf(stderr, "Could not open filename %s r mode the second time !!\n", filename), exit(1);
+	while (fgets(line, sizeof(line), fp) != NULL)
+	{
+		if (strlen(line) == 0 || line[0] == '#')
+			continue;
+		if (sscanf(line, "%s %s %f", word1, word2, &value) != 3)
+			fprintf(stderr, "Could not sscanf word1, word2, value line >>%s<<\n", line), exit(1);
+		if((index1 = facc_index(word1)) < 0)
+			fprintf(stderr, "Unexpected that word >>%s<< is not on facc list g_nent %d\n", word1, g_nent), exit(1);
+		if((index2 = facc_index(word2)) < 0)
+			fprintf(stderr, "Unexpected that word >>%s<< is not on facc list g_nent %d\n", word2, g_nent), exit(1);
+		if (dmx[index1][index2] > -90.0)
+			fprintf(stderr, "Unexpected duplicate word1 %s index1 %d word2 %s index2 %d g_nent %d\n",
+				word1, index1, word2, index2, g_nent), exit(1);
+		dmx[index1][index2] = dmx[index2][index1] = value;
+	}
+	fclose(fp);
+	return (dmx);
 }
 
 int main(int argc, char *argv[])
@@ -2563,13 +2600,24 @@ int main(int argc, char *argv[])
 		/* perform heavy lifting all pairs alignment, returning double **dmx */
 		dmx = align_fasta();
 		write_dmx(dmx, oprefix);
+		fprintf(stderr, "Proceeding with distance matrix dimension %d created by alignment\n", g_nent);
 	} else {
-		int nodes = 0, edges = 0;
+		/* read_dmx returns double ** but also sets g_nent and point labels facc */
 		dmx = read_dmx(f_dmxfilename);
+		fprintf(stderr, "Got DMX with %d entries, scanning for possible holes...\n", g_nent);
+		int i, j, neg = 0;
+		for (i = 0; i < g_nent; i++)
+			for (j = 0; j < g_nent; j++)
+				if ( dmx[i][j] < -0.0 ) {
+					fprintf(stderr, "Negative i, j %d %d v %g\n", i, j, dmx[i][j]);
+					neg++;
+				}
+		if (neg > 0)
+			fprintf(stderr, "Cannot proceed without a complete distance matrix\n"), exit(1);
+		fprintf(stderr, "Proceeding with distance matrix dimension %d read from file >>%s<<\n", g_nent, f_dmxfilename);
 	}
 
-	/* Construct tree based on distance matrix alone.
-	*/
+	/* Construct tree based on distance matrix alone.  */
 	BNODE *dree = bnode_distance_tree(g_nent, dmx);
 	treefile = char_vector(strlen(oprefix) + strlen(".dree.txt") + 1);
 	sprintf(treefile, "%s%s", oprefix, ".dree.txt");
