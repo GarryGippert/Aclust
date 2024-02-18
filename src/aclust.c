@@ -135,6 +135,7 @@ ACLUST was developed and written by Garry Paul Gippert, and packaged as a single
 #define MAXSEQUENCELEN 10000
 #define MAXFILENAME 1000
 #define MAXLINELEN 1000
+#define MAXWORDLEN 100
 #define DEFAULT_SCORE_MATRIX "dat/BLOSUM62.dat"
 
 #define ALIGN_GAP_CHAR '-'
@@ -160,10 +161,11 @@ int p_json = 1;			/* output alignments in pseudo-json format */
 int p_nonself = 0;		/* do not align with self (show only off-diagonal elements */
 
 char *scorematrixfile = NULL;
+char *f_dmxfilename = NULL;
 char *oprefix = NULL;
-char *alnfile = NULL;
-char *jsnfile = NULL;
-char *dmxfile = NULL;
+
+FILE *jsnfp = NULL;		/* file pointer for writing alignment JSON line-by-line */
+FILE *alnfp = NULL;		/* file pointer for writing alignment free text */
 
 void j_osb(FILE * fp)
 /* output jsonified open square bracket */
@@ -989,8 +991,6 @@ double compute_scoredistance(double ma, double mr, double m1, double m2, double 
 	return (sd);
 }
 
-FILE *alnfp = NULL;		/* file pointer for writing alignment free text */
-FILE *jsnfp = NULL;		/* file pointer for writing alignment JSON line-by-line */
 
 int p_strict = 0;		/* set to 1, and no deviation is allowed in the recomputation of alignment score */
 
@@ -1115,6 +1115,14 @@ double align_stats(char *name1, char *a1, char *name2, char *a2, int expected_pl
 
 	/* write alignments */
 	if (p_json) {
+		if (! jsnfp) {
+			char *filename = char_vector(strlen(oprefix) + strlen(".aln.js") + 1);
+			sprintf(filename, "%s%s", oprefix, ".aln.js");
+			fprintf(stderr, "jsnfile %s\n", filename);
+			if ((jsnfp = fopen(filename, "w")) == NULL)
+				fprintf(stderr, "Unable to open JSON file %s for writing\n", filename), exit(1);
+			free(filename);
+		}
 		/* JSON format parsable line-by-line */
 		j_osb(jsnfp);
 		/* input */
@@ -1149,7 +1157,14 @@ double align_stats(char *name1, char *a1, char *name2, char *a2, int expected_pl
 		j_csb(jsnfp);
 		fflush(jsnfp);
 	}
-	if (alnfp) {
+	if (1) {
+		if (! alnfp) {
+			char *filename = char_vector(strlen(oprefix) + strlen(".aln.txt") + 1);
+			sprintf(filename, "%s%s", oprefix, ".aln.txt");
+			if ((alnfp = fopen(filename, "w")) == NULL)
+				fprintf(stderr, "Unable to open aln file %s for writing\n", filename), exit(1);
+			free(filename);
+		}
 		/* free-form text */
 		fprintf(alnfp, "Align %s %d x %s %d", name1, n1, name2, n2);
 		fprintf(alnfp, " O1 %d O2 %d", o1, o2);
@@ -2299,17 +2314,22 @@ void write_tree_binary(BNODE * P, char *filename)
 	exit(1);
 }
 
-void write_dmx(double **dmx, char *filename)
+void write_dmx(double **dmx, char *oprefix)
 /* print distance upper half matrix plus diagonal */
 {
+	char *filename = char_vector(strlen(oprefix) + strlen(".dmx.txt") + 1);
+	sprintf(filename, "%s%s", oprefix, ".dmx.txt");
 	FILE *fp;
-	int i, j;
+	int i, j, c;
 	if ((fp = fopen(filename, "w")) == NULL)
 		fprintf(stderr, "Distance file %s cannot be opened for writing\n", filename), exit(1);
-	for (i = 0; i < g_nent; i++)
-		for (j = i; j < g_nent; j++)
+	for (c = 0, i = 0; i < g_nent; i++)
+		for (j = i; j < g_nent; j++, c++)
 			fprintf(fp, "%s %s %f\n", facc[i], facc[j], dmx[i][j]);
 	fclose(fp);
+	fprintf(stderr, "Wrote dmx %s %d elements, expect N(N+1)/2 %d for N=%d\n",
+		filename, c, g_nent*(g_nent+1)/2, g_nent);
+	free(filename);
 }
 
 BNODE *bnode_distance_tree(int n, double **dmx)
@@ -2347,6 +2367,7 @@ Optional parameters:\n\
 	-p <string>		prefix for all output files (default=name of first input fasta file)\n\
 	-d <integer>		embed dimension (default 20)\n\
 	-e <char>		(D) distance tree only, (S) distance+single embed trees, (F, default) distance+single+full embed trees\n\
+	-dmxfile <my.dmx>	Skips alignment phase and reads directly distance matrix in labelI labelJ DIJ\n\
 Optional flags:\n\
 	-m 			activates to interpret input Fasta as MSA\n\
 Less important flags:\n\
@@ -2391,7 +2412,13 @@ int pparse(int argc, char *argv[])
 {
 	int c = 1;
 	while (c < argc) {
-		if (strncmp(argv[c], "-h", 2) == 0) {
+		if (strncmp(argv[c], "-dmxfile", 8) == 0) {
+			if (++c == argc)
+				parameter_value_missing(c, argc, argv);
+			f_dmxfilename = char_string(argv[c++]);
+			fprintf(stderr, "f_dmxfilename set to '%s'\n", f_dmxfilename);
+		}
+		else if (strncmp(argv[c], "-h", 2) == 0) {
 			++c;
 			command_line_help(c, argc, argv);
 		}
@@ -2463,37 +2490,6 @@ int pparse(int argc, char *argv[])
 	return (c);
 }
 
-void output_initialization()
-/*  default file openings after parsing, but before doing anything else */
-{
-	if (!oprefix)
-		oprefix = char_string("this");
-	fprintf(stderr, "oprefix initialized to %s\n", oprefix);
-	if (!alnfile) {
-		alnfile = char_vector(strlen(oprefix) + strlen(".aln.txt") + 1);
-		sprintf(alnfile, "%s%s", oprefix, ".aln.txt");
-	}
-	fprintf(stderr, "alnfile %s\n", alnfile);
-	if ((alnfp = fopen(alnfile, "w")) == NULL)
-		fprintf(stderr, "Unable to open aln file %s for writing\n", alnfile), exit(1);
-	/* optional write JSON text */
-	if (p_json) {
-		if (!jsnfile) {
-			jsnfile = char_vector(strlen(oprefix) + strlen(".aln.js") + 1);
-			sprintf(jsnfile, "%s%s", oprefix, ".aln.js");
-		}
-		fprintf(stderr, "jsnfile %s\n", jsnfile);
-		if ((jsnfp = fopen(jsnfile, "w")) == NULL)
-			fprintf(stderr, "Unable to open JSON file %s for writing\n", jsnfile), exit(1);
-	}
-	if (!dmxfile) {
-		dmxfile = char_vector(strlen(oprefix) + strlen(".dmx.txt") + 1);
-		sprintf(dmxfile, "%s%s", oprefix, ".dmx.txt");
-	}
-	fprintf(stderr, "dmxfile %s\n", dmxfile);
-	/* Here is where we initialize additional output files with a standard prefix */
-}
-
 void read_fasta_files(int argc, char *argv[], int cstart)
 {
 	fprintf(stderr, "%s Trying to read multiple fasta files, c start %d of %d\n", argv[0], cstart, argc);
@@ -2513,30 +2509,64 @@ void explain_input_better(int argc, char *argv[], int cstart)
 		fprintf(stderr, "Input file(s) needed, expecting Fasta filenames\n"), exit(1);
 }
 
+/* usage
+	double **dmx = read_dmx(f_dmxfilename);
+*/
+
+double **read_dmx(char *filename)
+{
+/* remember MAXENTRIES 10000
+	int g_nent = 0;
+	char *facc[MAXENTRIES];
+*/
+	char line[MAXLINELEN], word1[MAXWORDLEN], word2[MAXWORDLEN];
+	float value;
+	FILE *fp = fopen(filename, "r");
+	if (!fp) fprintf(stderr, "Could not open filename %s r mode\n", filename), exit(1);
+	int nent = 0;
+	while (fgets(line, sizeof(line), fp) != NULL)
+	{
+		if (strlen(line) == 0 || line[0] == '#')
+			continue;
+		if (sscanf(line, "%s %s %f", word1, word2, &value) != 3)
+			fprintf(stderr, "Could not sscanf word1, word2, value line >>%s<<\n", line), exit(1);
+		printf("word1 %s word2 %s value %g\n", word1, word2, value);
+	}
+	fprintf(stderr, "All ok\n"), exit(0);
+	return NULL;
+
+}
+
 int main(int argc, char *argv[])
 {
 	char *treefile = NULL;
 	int c = pparse(argc, argv);
+	if (!oprefix) {
+		oprefix = char_string("this");
+		fprintf(stderr, "oprefix initialized to %s\n", oprefix);
+	}
 	if (c == 1)
 		explain_input_better(argc, argv, c);
-
-	/* Read scorematrix before Fasta */
-
-	if (!scorematrixfile)
-		scorematrixfile = char_string(DEFAULT_SCORE_MATRIX);
-	read_scorematrix(scorematrixfile);
-
-	read_fasta_files(argc, argv, c);
-
 	if (!oprefix)
 		oprefix = char_string(argv[c]);
 	fprintf(stderr, "oprefix set to %s\n", oprefix);
 
-	output_initialization();
+	double **dmx = NULL;
 
-	double **dmx = align_fasta();
-
-	write_dmx(dmx, dmxfile);
+	if (!f_dmxfilename) {
+		/* usual business of generating dmx */
+		/* Read scorematrix before Fasta  - why ? maybe it was to initialize index lookup ? */
+		if (!scorematrixfile)
+			scorematrixfile = char_string(DEFAULT_SCORE_MATRIX);
+		read_scorematrix(scorematrixfile);
+		read_fasta_files(argc, argv, c);
+		/* perform heavy lifting all pairs alignment, returning double **dmx */
+		dmx = align_fasta();
+		write_dmx(dmx, oprefix);
+	} else {
+		int nodes = 0, edges = 0;
+		dmx = read_dmx(f_dmxfilename);
+	}
 
 	/* Construct tree based on distance matrix alone.
 	*/
