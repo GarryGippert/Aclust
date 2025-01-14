@@ -155,8 +155,8 @@ ACLUST was developed and written by Garry Paul Gippert, and packaged as a single
 #define SIGN(a)		( (a) < 0.0 ?   (-1.0) :    (1.0) )
 
 int p_v = 0;			/* verbose flag, set to 1 for additional diagnostic output */
-double p_fg = 12.0;		/* first gap penalty */
-double p_ng = 1.0;		/* next gap penalty */
+double p_go = 12.0;		/* gap open = first gap penalty */
+double p_ge = 1.0;		/* gap extend = next gap penalty */
 int p_json = 1;			/* output alignments in pseudo-json format */
 int p_nonself = 0;		/* do not align with self (show only off-diagonal elements */
 
@@ -664,7 +664,7 @@ double align_score(int n1, int n2, double **S, double **M, int *o1, int *o2, int
 		Tij = T[n1][j + 1];
 		T[n1][j] = Tij;
 		U[n1][j] = Tij;
-		V[n1][j] = Tij - p_fg;
+		V[n1][j] = Tij - p_go;
 	}
 
 	/* backwards from last row */
@@ -678,7 +678,7 @@ double align_score(int n1, int n2, double **S, double **M, int *o1, int *o2, int
 		Up = U[i + 1];
 		Vp = V[i + 1];
 		Ti[n2] = Tp[n2];
-		Ui[n2] = Ti[n2] - p_fg;
+		Ui[n2] = Ti[n2] - p_go;
 		Vi[n2] = Ti[n2];
 
 		/* backwards from last column */
@@ -686,21 +686,21 @@ double align_score(int n1, int n2, double **S, double **M, int *o1, int *o2, int
 			Tij = Tp[j + 1] + Si[j];
 			Mi[j] = Tij;
 			/* insertion in sequence 2 */
-			t1 = Vp[j] - p_ng;
-			t2 = Tp[j] - p_fg;
+			t1 = Vp[j] - p_ge;
+			t2 = Tp[j] - p_go;
 			Vij = (t1 > t2 ? t1 : t2);
 			if (flag & ALIGN_CROSS) {
-				t3 = Up[j] - p_ng;
+				t3 = Up[j] - p_ge;
 				Vij = (t3 > Vij ? t3 : Vij);
 			}
 			if (Vij > Tij)
 				Tij = Vij;
 			/* insertion in sequence 1 */
-			t1 = Ui[j + 1] - p_ng;
-			t2 = Ti[j + 1] - p_fg;
+			t1 = Ui[j + 1] - p_ge;
+			t2 = Ti[j + 1] - p_go;
 			Uij = (t1 > t2 ? t1 : t2);
 			if (flag & ALIGN_CROSS) {
-				t3 = Vi[j + 1] - p_ng;
+				t3 = Vi[j + 1] - p_ge;
 				Uij = (t3 > Uij ? t3 : Uij);
 			}
 			if (Uij > Tij)
@@ -779,7 +779,7 @@ int align_index(int n1, int n2, double **S, double **M, int o1, int o2, int **d1
 
 		/* gap in column ? */
 		for (k = nk + 1; k < n1; k++) {
-			tmp = M[k][nl] - p_fg - p_ng * (k - nk - 1);
+			tmp = M[k][nl] - p_go - p_ge * (k - nk - 1);
 			if (tmp > max) {
 				max = tmp;
 				bk = k;
@@ -788,7 +788,7 @@ int align_index(int n1, int n2, double **S, double **M, int o1, int o2, int **d1
 
 		/* gap in row ? */
 		for (l = nl + 1; l < n2; l++) {
-			tmp = M[nk][l] - p_fg - p_ng * (l - nl - 1);
+			tmp = M[nk][l] - p_go - p_ge * (l - nl - 1);
 			if (tmp > max) {
 				max = tmp;
 				bl = l;
@@ -799,7 +799,7 @@ int align_index(int n1, int n2, double **S, double **M, int o1, int o2, int **d1
 			for (k = nk; k < n1; k++) {
 				for (l = nl; l < n2; l++) {
 					tg = k - nk + l - nl;
-					tmp = M[k][l] - (tg ? p_fg - p_ng * (tg - 1) : 0.0);
+					tmp = M[k][l] - (tg ? p_go - p_ge * (tg - 1) : 0.0);
 					if (tmp > max) {
 						max = tmp;
 						bk = k;
@@ -911,7 +911,7 @@ void align_strings(char *name1, int n1, char *name2, int n2, double **S, double 
 
 		/* gap in column ? */
 		for (i = nk + 1; i < n1; i++) {
-			tmp = M[i][nl] - p_fg - p_ng * (i - nk - 1);
+			tmp = M[i][nl] - p_go - p_ge * (i - nk - 1);
 			if (tmp > max) {
 				max = tmp;
 				bk = i;
@@ -920,7 +920,7 @@ void align_strings(char *name1, int n1, char *name2, int n2, double **S, double 
 
 		/* gap in row ? */
 		for (i = nl + 1; i < n2; i++) {
-			tmp = M[nk][i] - p_fg - p_ng * (i - nl - 1);
+			tmp = M[nk][i] - p_go - p_ge * (i - nl - 1);
 			if (tmp > max) {
 				max = tmp;
 				bl = i;
@@ -1043,8 +1043,8 @@ double align_stats(char *name1, char *a1, char *name2, char *a2, int expected_pl
 		if (fabs(s) < 100)
 			sum_score += s;
 		if (p_v)
-			printf("p_fg %g x olen %d + p_ng %g x (glen %d - olen %d)\n", p_fg, olen, p_ng, glen, olen);
-		gap_score = p_fg * (float)(olen) + p_ng * (float)(glen - olen);
+			printf("p_go %g x olen %d + p_ge %g x (glen %d - olen %d)\n", p_go, olen, p_ge, glen, olen);
+		gap_score = p_go * (float)(olen) + p_ge * (float)(glen - olen);
 		if (p_v)
 			printf("stats plen %d : '%d%c' vs '%d%c' :  score %g, sumscore %g, gapscore %g, total_score %g\n",
 		       		i, n1, a, n2, b, s, sum_score, gap_score, (sum_score - gap_score));
@@ -1078,7 +1078,7 @@ double align_stats(char *name1, char *a1, char *name2, char *a2, int expected_pl
 		isg = 0;
 	}
 	int error = 0;
-	double gapcost = olen * p_fg + (glen - olen) * p_ng;
+	double gapcost = olen * p_go + (glen - olen) * p_ge;
 	ascore = mscore - gapcost;
 	if (expected_ascore > 0.0 && ascore != expected_ascore) {
 		if (p_v)
@@ -2368,6 +2368,8 @@ Optional parameters:\n\
 	-d <integer>		embed dimension (default 20)\n\
 	-e <char>		(D) distance tree only, (S) distance+single embed trees, (F, default) distance+single+full embed trees\n\
 	-dmxfile <my.dmx>	Skips alignment phase and reads directly distance matrix in labelI labelJ DIJ\n\
+	-go <float>		Gap open penalty\n\
+	-ge <float>		Gap extend penalty\n\
 Optional flags:\n\
 	-m 			activates to interpret input Fasta as MSA\n\
 Less important flags:\n\
@@ -2448,6 +2450,24 @@ int pparse(int argc, char *argv[])
 				parameter_value_missing(c, argc, argv);
 			if (sscanf(argv[c], "%c", &p_e) == 1)
 				fprintf(stderr, "Embed set to %d\n", p_e);
+			else
+				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
+			c++;
+		}
+		else if (strncmp(argv[c], "-go", 3) == 0) {
+			if (++c == argc)
+				parameter_value_missing(c, argc, argv);
+			if (sscanf(argv[c], "%lf", &p_go) == 1)
+				fprintf(stderr, "Gap open set to %g\n", p_go);
+			else
+				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
+			c++;
+		}
+		else if (strncmp(argv[c], "-ge", 3) == 0) {
+			if (++c == argc)
+				parameter_value_missing(c, argc, argv);
+			if (sscanf(argv[c], "%lf", &p_ge) == 1)
+				fprintf(stderr, "Gap extension set to %g\n", p_ge);
 			else
 				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
 			c++;
