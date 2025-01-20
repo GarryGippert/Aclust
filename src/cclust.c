@@ -1315,40 +1315,18 @@ void bnode_printone(BNODE *B, int n, double **dmx)
 	fprintf(stderr, " between %4d %4d <dLR> %g\n", bnode_count(B->left), bnode_count(B->right), branch_distance_between(B->left, B->right, n, dmx));
 }
 
-int collapse(BNODE *B, int n, double **dmx)
-{
-	/* do not collapse if node is a singleton */
-	int minc = 1, c = bnode_count(B);
-	fprintf(stderr, "N %d, minc %d\n", c, minc);
-	if (c <= minc) {
-		if (p_v)
-			fprintf(stderr, "N %d <= minc %d\n", c, minc);
-		return( 0 );
-	}
-	bnode_printone(B, n, dmx);
-	/* do not collapse if branch_distance_between > arbitrary threshold */
-	double dl = branch_distance_within(B->left, n, dmx);
-	double dr = branch_distance_within(B->right, n, dmx);
-	double dlr = branch_distance_between(B->left, B->right, n, dmx);
-	double maxd = 100.0;
-	if (dlr > maxd) {
-		fprintf(stderr, "<dLR> %g > maxd %g\n", dlr, maxd);
-		return( 0 );
-	}
-	return 1;
-}
-
 void bnode_collapse(BNODE *B, int n, double **dmx, FILE *fp)
 {
-	if (collapse(B, n, dmx)) {
+	int minc = 2;
+	double mind = 50.0;
+	if ( bnode_count(B) <= minc )
+		return;
+	if ( branch_distance_between(B->left, B->right, n, dmx) <= mind ) {
 		fprintf(fp, "%s|%s\n", leftmost(B), rightmost(B));
+		return;
 	}
-	else {
-		if (B->left)
-			bnode_collapse(B->left, n, dmx, fp);
-		if (B->right)
-			bnode_collapse(B->right, n, dmx, fp);
-	}
+	bnode_collapse(B->left, n, dmx, fp);
+	bnode_collapse(B->right, n, dmx, fp);
 }
 
 int main(int argc, char *argv[])
