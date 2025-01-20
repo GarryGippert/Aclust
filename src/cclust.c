@@ -592,6 +592,8 @@ double bnode_dis(BNODE * A, BNODE * B)
 int bnode_count(BNODE * B)
 /* recursive number of defined leaf nodes in tree */
 {
+	if (! B)
+		return 0;
 	if (B->index >= 0)
 		return 1;
 	else if (B->left == NULL || B->right == NULL)
@@ -1241,6 +1243,8 @@ int *bnode_index_vector(BNODE *B, int *n)
 double branch_distance_within(BNODE *A, int n, double **dmx)
 /* compute average dmx distance among leaf nodes in branche A */
 {
+	if (! A)
+		return UNDEF_DIS;
 	int a, *indexa, i, j;
 	indexa = bnode_index_vector(A, &a);
 	double dis, sum = 0.0, sqr = 0.0, cnt = 0.0, ave=UNDEF_DIS, rms=UNDEF_DIS;
@@ -1255,7 +1259,8 @@ double branch_distance_within(BNODE *A, int n, double **dmx)
 		ave = sum/cnt;
 		rms = sqrt(sqr/cnt - ave*ave);
 	}
-	fprintf(stderr, "Na %d Cnt %g Ave %g Rms %g\n", a, cnt, ave, rms);
+	if (p_v)
+		fprintf(stderr, "Na %d Cnt %g Ave %g Rms %g\n", a, cnt, ave, rms);
 	int_vector_free(a, indexa);
 	return ave;
 }
@@ -1278,7 +1283,8 @@ double branch_distance_between(BNODE *A, BNODE *B, int n, double **dmx)
 		ave = sum/cnt;
 		rms = sqrt(sqr/cnt - ave*ave);
 	}
-	fprintf(stderr, "Na %d Nb %d Cnt %g Ave %g Rms %g\n", a, b, cnt, ave, rms);
+	if (p_v)
+		fprintf(stderr, "Na %d Nb %d Cnt %g Ave %g Rms %g\n", a, b, cnt, ave, rms);
 	int_vector_free(a, indexa);
 	int_vector_free(b, indexb);
 	return ave;
@@ -1298,23 +1304,51 @@ char *rightmost(BNODE *B)
 	return facc[B->index];
 }
 
-void bnode_split(BNODE *B, int n, double **dmx)
+void bnode_printone(BNODE *B, int n, double **dmx)
 {
-	printf("bnode index %d %g : left I %d, D %g, N %d, AD %g ; right I %d, D %g, N %d, AD %g ; distance %g\n",
-		B->index,
-		B->parent_distance,
-		B->left->index,
-		B->left_distance,
-		bnode_count(B->left),
-		branch_distance_within(B->left, n, dmx),
-		B->right->index,
-		B->right_distance,
-		bnode_count(B->right),
-		branch_distance_within(B->right, n, dmx),
-		branch_distance_between(B->left, B->right, n, dmx));
-	printf("extreme %s|%s\n", leftmost(B->left), rightmost(B->left));
-	printf("extreme %s|%s\n", leftmost(B->right), rightmost(B->right));
-	exit(0);
+	fprintf(stderr, "parent   %4d %4d %s %g\n",
+		B->index, bnode_count(B), (B->index >= 0 ? facc[B->index] : ""), B->parent_distance);
+	fprintf(stderr, "  left   %4d %4d %g <dL> %g\n",
+		(B->left ? B->left->index : -1), bnode_count(B->left), B->left_distance, branch_distance_within(B->left, n, dmx));
+	fprintf(stderr, " right   %4d %4d %g <dR> %g\n",
+		(B->right ? B->right->index : -1), bnode_count(B->right), B->right_distance, branch_distance_within(B->right, n, dmx));
+	fprintf(stderr, " between %4d %4d <dLR> %g\n", bnode_count(B->left), bnode_count(B->right), branch_distance_between(B->left, B->right, n, dmx));
+}
+
+int collapse(BNODE *B, int n, double **dmx)
+{
+	/* do not collapse if node is a singleton */
+	int minc = 1, c = bnode_count(B);
+	fprintf(stderr, "N %d, minc %d\n", c, minc);
+	if (c <= minc) {
+		if (p_v)
+			fprintf(stderr, "N %d <= minc %d\n", c, minc);
+		return( 0 );
+	}
+	bnode_printone(B, n, dmx);
+	/* do not collapse if branch_distance_between > arbitrary threshold */
+	double dl = branch_distance_within(B->left, n, dmx);
+	double dr = branch_distance_within(B->right, n, dmx);
+	double dlr = branch_distance_between(B->left, B->right, n, dmx);
+	double maxd = 100.0;
+	if (dlr > maxd) {
+		fprintf(stderr, "<dLR> %g > maxd %g\n", dlr, maxd);
+		return( 0 );
+	}
+	return 1;
+}
+
+void bnode_collapse(BNODE *B, int n, double **dmx, FILE *fp)
+{
+	if (collapse(B, n, dmx)) {
+		fprintf(fp, "%s|%s\n", leftmost(B), rightmost(B));
+	}
+	else {
+		if (B->left)
+			bnode_collapse(B->left, n, dmx, fp);
+		if (B->right)
+			bnode_collapse(B->right, n, dmx, fp);
+	}
 }
 
 int main(int argc, char *argv[])
@@ -1340,7 +1374,9 @@ int main(int argc, char *argv[])
 	write_tree(dree, treefile);
 	free(treefile);
 
-	bnode_split(dree, g_nent, dmx);
+	FILE *fp = stdout;
+	fprintf(fp, "COLLAPSE\nDATA\n");
+	bnode_collapse(dree, g_nent, dmx, fp);
 
 	int_vector_free(g_nent, index);
 	exit(0);
