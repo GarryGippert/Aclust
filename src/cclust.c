@@ -1329,6 +1329,30 @@ void bnode_collapse(BNODE *B, int n, double **dmx, FILE *fp)
 	bnode_collapse(B->right, n, dmx, fp);
 }
 
+void bnode_abrl(BNODE *B, double branch, double *sum, double *cnt)
+{
+	/* termination - not sure when we would ever need this... */
+	if (! B)
+		return;
+	/* count leaf nodes and add parent distance to sum */
+	if (B->index > -1) {
+		printf("leaf %4d %-20s branch %7.3f\n", B->index, facc[B->index], branch);
+		*sum += branch;
+		*cnt += 1.0;
+		return;
+	}
+	bnode_abrl(B->left, branch + B->left_distance, &(*sum), &(*cnt));
+	bnode_abrl(B->right, branch + B->right_distance, &(*sum), &(*cnt));
+}
+
+void bnode_collapse_abrl(BNODE *B, int n, double **dmx, FILE *fp)
+{
+	double sum = 0.0, cnt = 0.0;
+	bnode_abrl(B, 0.0, &sum, &cnt);
+	printf("ABRL sum %g cnt %g ave %g\n", sum, cnt, sum/cnt);
+	exit(0);
+}
+
 int main(int argc, char *argv[])
 {
 	int c = pparse(argc, argv);
@@ -1354,8 +1378,11 @@ int main(int argc, char *argv[])
 
 	FILE *fp = stdout;
 	fprintf(fp, "COLLAPSE\nDATA\n");
+#ifdef METHOD1
 	bnode_collapse(dree, g_nent, dmx, fp);
-
+#else
+	bnode_collapse_abrl(dree, g_nent, dmx, fp);
+#endif
 	int_vector_free(g_nent, index);
 	exit(0);
 }
