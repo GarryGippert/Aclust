@@ -1330,13 +1330,15 @@ void bnode_collapse(BNODE *B, int n, double **dmx, FILE *fp)
 }
 
 void bnode_abrl(BNODE *B, double branch, double *sum, double *cnt)
+/* recursively compute sum of total branchlengths to leaf nodes, and count of leaf nodes */
 {
 	/* termination - not sure when we would ever need this... */
 	if (! B)
 		return;
 	/* count leaf nodes and add parent distance to sum */
 	if (B->index > -1) {
-		printf("leaf %4d %-20s branch %7.3f\n", B->index, facc[B->index], branch);
+		if (p_v)
+			fprintf(stderr, "leaf %4d %-20s branch %7.3f\n", B->index, facc[B->index], branch);
 		*sum += branch;
 		*cnt += 1.0;
 		return;
@@ -1347,10 +1349,17 @@ void bnode_abrl(BNODE *B, double branch, double *sum, double *cnt)
 
 void bnode_collapse_abrl(BNODE *B, int n, double **dmx, FILE *fp)
 {
-	double sum = 0.0, cnt = 0.0;
+	double sum = 0.0, cnt = 0.0, ave;
 	bnode_abrl(B, 0.0, &sum, &cnt);
-	printf("ABRL sum %g cnt %g ave %g\n", sum, cnt, sum/cnt);
-	exit(0);
+	if (cnt <= 1.0)
+		return;
+	if ((ave = sum/cnt) <= 50.0) {
+		fprintf(fp, "# ABRL sum %g cnt %g ave %g\n", sum, cnt, ave);
+		fprintf(fp, "%s|%s\n", leftmost(B), rightmost(B));
+		return;
+	}
+	bnode_collapse_abrl(B->left, n, dmx, fp);
+	bnode_collapse_abrl(B->right, n, dmx, fp);
 }
 
 int main(int argc, char *argv[])
