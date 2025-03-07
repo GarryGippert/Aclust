@@ -1,6 +1,8 @@
 /* ACLUST
 
-Aclust generates a phylogenetic tree from FASTA input.
+Aclust generates a phylogenetic tree from sequence pairwise distances,
+computed either by pre-aligned (multiple aligned) FASTA input, or by
+generating all-vs-all pairwise local alignments using SW.
 
 Please contact the author Garry Paul Gippert, GarryG@dtu.dk, DTU Bioengineering,
 Danish Technical University, with questions or for more information.
@@ -1650,8 +1652,52 @@ void printpos(FILE * fp, BNODE * B)
 		fprintf(fp, "\n");
 }
 
+/* recursive assign ith value of index vector to tree-ordered leaf index */
+void bnode_indexi(BNODE * B, int *index, int *i)
+{
+	if (B->index >= 0)
+		index[(*i)++] = B->index;
+	else if (B->left && B->right) {
+		bnode_indexi(B->left, index, &(*i));
+		bnode_indexi(B->right, index, &(*i));
+	}
+	else
+		fprintf(stderr, "bnode_indexi: B->left xor B->right in bnode_indexi\n"), exit(1);
+}
+
+void bnode_print_measure(FILE *fp, BNODE *left, BNODE *right, double **dmx)
+/* print comparison between left and right branches */
+{
+
+	int n = bnode_count(left);	/* number of leaves in left subtree */
+	int *index = int_vector(n), i = 0;
+	bnode_indexi(left, index, &i);
+
+	int m = bnode_count(right);	/* number of leaves in right subtree */
+	int *jndex = int_vector(m), j = 0;
+	bnode_indexi(right, jndex, &j);
+
+	double sum = 0.0, cnt = 0.0, sqr = 0.0, dis;
+	for (i = 0; i < n; i++)
+		for (j = 0; j < m; j++) {
+			dis = dmx[index[i]][jndex[j]];
+			//printf("i %d j %d dis %g\n", i, j, dis);
+			sum += dis;
+			cnt += 1.0;
+			sqr += dis*dis;
+		}
+	double ave = 0.0, rms = 0.0;
+	if (cnt > 0.0){
+		ave = sum/cnt;
+		rms = sqrt(fabs(sqr/cnt - ave*ave));
+	}
+	fprintf(fp, "[&dave=%.1f,drms=%.1f]", ave, rms);
+	free((char *)index);
+	free((char *)jndex);
+}
+
 /* print binary tree */
-void bnode_print_tree(FILE * fp, BNODE * B)
+void bnode_print_tree(FILE * fp, BNODE * B, double **dmx)
 {
 
 	if (p_v > 1)
@@ -1670,7 +1716,7 @@ void bnode_print_tree(FILE * fp, BNODE * B)
 		fprintf(fp, "(");
 		if (PRINTPOS)
 			printpos(fp, B->left);
-		bnode_print_tree(fp, B->left);
+		bnode_print_tree(fp, B->left, dmx);
 		fprintf(fp, ":%g", B->left_distance);
 		if (PRINTNL)
 			fprintf(fp, "\n");
@@ -1678,33 +1724,21 @@ void bnode_print_tree(FILE * fp, BNODE * B)
 		fprintf(fp, ",");
 		if (PRINTPOS)
 			printpos(fp, B->right);
-		bnode_print_tree(fp, B->right);
+		bnode_print_tree(fp, B->right, dmx);
 		fprintf(fp, ":%g", B->right_distance);
 		if (PRINTNL)
 			fprintf(fp, "\n");
 		fprintf(fp, ")");
+		bnode_print_measure(fp, B->left, B->right, dmx);
 	}
 }
 
-void bnode_print(FILE * fp, BNODE * B)
+void bnode_print(FILE * fp, BNODE * B, double **dmx)
 {
-	bnode_print_tree(fp, B);
+	bnode_print_tree(fp, B, dmx);
 	fprintf(fp, ":0;");	/* terminate tree */
 	if (PRINTNL)
 		fprintf(fp, "\n");
-}
-
-/* recursive assign ith value of index vector to tree-ordered leaf index */
-void bnode_indexi(BNODE * B, int *index, int *i)
-{
-	if (B->index >= 0)
-		index[(*i)++] = B->index;
-	else if (B->left && B->right) {
-		bnode_indexi(B->left, index, &(*i));
-		bnode_indexi(B->right, index, &(*i));
-	}
-	else
-		fprintf(stderr, "bnode_indexi: B->left xor B->right in bnode_indexi\n"), exit(1);
 }
 
 void bnode_bnodei(BNODE * B, BNODE ** bnode, int *i)
@@ -1860,7 +1894,7 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 
 		if (p_v > 1) {
 			fprintf(stderr, "intermediate tree\n");
-			bnode_print(stderr, P);
+			bnode_print(stderr, P, dmx);
 		}
 
 		if (p_v > 1)
@@ -1930,7 +1964,7 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 }
 
 /* provide a binary tree from a position matrix with dimensions n x dim, using nearest-neighbor joining algorithm */
-BNODE *bnode_tree(double **pos, int *index, int n, int dim)
+BNODE *bnode_tree(double **pos, int *index, int n, int dim, double **dmx)
 {
 
 	/* algorithm: // allocate BNODE vector of length 2N-1, with N of them with 'natural' index numbers (leaf nodes)
@@ -2056,7 +2090,7 @@ BNODE *bnode_tree(double **pos, int *index, int n, int dim)
 
 		if (p_v > 1) {
 			fprintf(stderr, "intermediate tree\n");
-			bnode_print(stderr, P);
+			bnode_print(stderr, P, dmx);
 		}
 
 		if (p_v > 1)
@@ -2222,7 +2256,7 @@ BNODE *bnode_reembed(BNODE * B, char br, double **odmx, int on, int dim)
 		fprintf(stderr, "bnode_reembed br=%c n= %d on= %d dim %d\n", br, n, on, dim);
 
 	if (p_v > 1)
-		bnode_print(stderr, B);
+		bnode_print(stderr, B, odmx);
 
 	/* assign indices to local vector */
 	int *index = int_vector(n), i = 0, j;
@@ -2255,11 +2289,11 @@ BNODE *bnode_reembed(BNODE * B, char br, double **odmx, int on, int dim)
 
 	/* generate a subtree from the new positions */
 	BNODE *P;
-	P = bnode_tree(pos, index, n, dim);
+	P = bnode_tree(pos, index, n, dim, odmx);
 
 	if (p_v > 1) {
 		fprintf(stderr, "after reembedn\n");
-		bnode_print(stderr, P);
+		bnode_print(stderr, P, dmx);
 	}
 
 	/* transfer information */
@@ -2293,18 +2327,18 @@ BNODE *bnode_reembed(BNODE * B, char br, double **odmx, int on, int dim)
 
 }
 
-void write_tree(BNODE * P, char *filename)
+void write_tree(BNODE * P, char *filename, double **dmx)
 {
 	FILE *fp;
 	if ((fp = fopen(filename, "w")) == NULL)
 		fprintf(stderr, "Tree file %s cannot be opened for writing\n", filename), exit(1);
-	bnode_print(fp, P);
+	bnode_print(fp, P, dmx);
 	int n = bnode_count(P);
 	fprintf(stderr, "Tree file %s with %d nodes written\n", filename, n);
 	fclose(fp);
 }
 
-void write_tree_binary(BNODE * P, char *filename)
+void write_tree_binary(BNODE * P, char *filename, double **dmx)
 {
 	fprintf(stderr, "write_tree_binary stub bnode %d, filename %s\n", bnode_length(P), filename);
 	return ;
@@ -2352,7 +2386,7 @@ BNODE *bnode_embed_tree(int n, double **dmx)
 {
 	double **pos = embed_dmx(n, dmx);
 	int *index = int_vector_ramp(n);
-	BNODE *P = bnode_tree(pos, index, n, p_dim);
+	BNODE *P = bnode_tree(pos, index, n, p_dim, dmx);
 	int_vector_free(n, index);
 	return P;
 }
@@ -2642,7 +2676,7 @@ int main(int argc, char *argv[])
 	treefile = char_vector(strlen(oprefix) + strlen(".dree.txt") + 1);
 	sprintf(treefile, "%s%s", oprefix, ".dree.txt");
 	fprintf(stderr, "Distance tree %s\n", treefile);
-	write_tree(dree, treefile);
+	write_tree(dree, treefile, dmx);
 	free(treefile);
 	if (p_e == 'D')
 		fprintf(stderr, "Halt after distance tree\n"), exit(0);
@@ -2653,7 +2687,7 @@ int main(int argc, char *argv[])
 	treefile = char_vector(strlen(oprefix) + strlen(".tree0.txt") + 1);
 	sprintf(treefile, "%s%s", oprefix, ".tree0.txt");
 	fprintf(stderr, "Single embed tree %s\n", treefile);
-	write_tree(tree, treefile);
+	write_tree(tree, treefile, dmx);
 	free(treefile);
 	if (p_e == 'S')
 		fprintf(stderr, "Halt after single embed tree\n"), exit(0);
@@ -2665,11 +2699,11 @@ int main(int argc, char *argv[])
 	treefile = char_vector(strlen(oprefix) + strlen(".tree.txt") + 1);
 	sprintf(treefile, "%s%s", oprefix, ".tree.txt");
 	fprintf(stderr, "Full recursive embed tree %s\n", treefile);
-	write_tree(tree, treefile);
+	write_tree(tree, treefile, dmx);
 	free(treefile);
 
 	char *binary_treefile = char_string("binary_treefile.btf");
-	write_tree_binary(tree, binary_treefile);
+	write_tree_binary(tree, binary_treefile, dmx);
 
 	exit(0);
 }
