@@ -138,7 +138,7 @@ ACLUST was developed and written by Garry Paul Gippert, and packaged as a single
 #define MAXFILENAME 1000
 #define MAXLINELEN 1000
 #define MAXWORDLEN 100
-#define DEFAULT_SCORE_MATRIX "dat/BLOSUM62.dat"
+#define DEFAULT_SCORE_MATRIX "../dat/BLOSUM62.dat"
 
 #define ALIGN_GAP_CHAR '-'
 #define ALIGN_GAP_VAL -99.9
@@ -161,6 +161,7 @@ double p_go = 12.0;		/* gap open = first gap penalty */
 double p_ge = 1.0;		/* gap extend = next gap penalty */
 int p_json = 1;			/* output alignments in pseudo-json format */
 int p_nonself = 0;		/* do not align with self (show only off-diagonal elements */
+int p_metadata = 0;		/* print tree with metadata comparing left and right branches */
 
 char *scorematrixfile = NULL;
 char *f_dmxfilename = NULL;
@@ -1665,8 +1666,8 @@ void bnode_indexi(BNODE * B, int *index, int *i)
 		fprintf(stderr, "bnode_indexi: B->left xor B->right in bnode_indexi\n"), exit(1);
 }
 
-void bnode_print_measure(FILE *fp, BNODE *left, BNODE *right, double **dmx)
-/* print comparison between left and right branches */
+void bnode_print_metadata(FILE *fp, BNODE *left, BNODE *right, double **dmx)
+/* print metadata comparing left and right branches */
 {
 
 	int n = bnode_count(left);	/* number of leaves in left subtree */
@@ -1729,7 +1730,8 @@ void bnode_print_tree(FILE * fp, BNODE * B, double **dmx)
 		if (PRINTNL)
 			fprintf(fp, "\n");
 		fprintf(fp, ")");
-		bnode_print_measure(fp, B->left, B->right, dmx);
+		if (p_metadata)
+			bnode_print_metadata(fp, B->left, B->right, dmx);
 	}
 }
 
@@ -2396,7 +2398,7 @@ ACLUST  Generates pairwise alignments, distance matrix and phylogenetic tree fro
 Input entries may be pre-aligned, for example Fasta format output produced by MAFFT, or unaligned.\n\
 \n\
 Required parameters:\n\
-	-s <path>		file location of substitution score matrix (could be 'dat/BLOSUM62.txt')\n\
+	-s <path>		filepath and name of substitution score matrix (e.g., '../dat/BLOSUM62.txt')\n\
 Optional parameters:\n\
 	-p <string>		prefix for all output files (default=name of first input fasta file)\n\
 	-d <integer>		embed dimension (default 20)\n\
@@ -2406,6 +2408,7 @@ Optional parameters:\n\
 	-ge <float>		Gap extend penalty\n\
 Optional flags:\n\
 	-m 			activates to interpret input Fasta as MSA\n\
+	-metadata 		activates print of average left-right node pair distances within tree\n\
 Less important flags:\n\
 	-j			deactivates writing of JSON alignment file\n\
 	-nonself		deactivates self alignments\n\
@@ -2510,6 +2513,11 @@ int pparse(int argc, char *argv[])
 			++c;
 			p_nonself = (p_nonself + 1) % 2;
 			fprintf(stderr, "nonself flag set to %d\n", p_nonself);
+		}
+		else if (strncmp(argv[c], "-metadata", 9) == 0) {
+			++c;
+			p_metadata = (p_metadata + 1) % 2;
+			fprintf(stderr, "metadata flag set to %d\n", p_metadata);
 		}
 		else if (strncmp(argv[c], "-j", 2) == 0) {
 			++c;
