@@ -633,48 +633,6 @@ void read_fasta(char *filename)
 		print_fasta();
 }
 
-/* ALN structure */
-typedef struct aln {
-	struct aln *next;
-	char *name1, *name2, *seq1, *seq2, *aln1, *aln2;	/* accession, sequence string and alignment string of each pair */
-	int len1, len2, start1, start2, end1, end2;		/* sequence lengths and start/end coordinates (1-based) */
-	int plen, alen, mlen, ilen, glen, olen, clen, nlen;	/* counts related to alignment */
-	double ascore, mscore, aprime, mprime, ab, mb, mscore1, mscore2, mscorer, mscorea, sd0, sd1, sd2, sd;	/* properties of the alignment */
-	double zscore, pscore;					/* related to CE alignments */
-	double score, evalue, bitscore;				/* related to BLAST alignemnts */
-} ALN;
-
-ALN *aln_alloc()
-/* return an allocated but empty ALN object */
-{
-	ALN *A = NULL;
-	if ((A = (ALN *) malloc(sizeof(ALN))) == NULL)
-		fprintf(stderr, "Could not allocate ALN object\n"), exit(1);
-	A->next = NULL;
-	A->name1 = A->name2 = A->seq1 = A->seq2 = A->aln1 = A->aln2 = NULL;
-	A->len1 = A->len1 = A->start1 = A->start2 = A->end1 = A->end2 = -1;
-	A->plen = A->alen = A->mlen = A->ilen = A->glen = A->olen = A->clen = A->nlen = 0;
-	A->ascore = A->mscore = A->aprime = A->mprime = A->ab = A->mb = A->mscore1 = A->mscore2 = A->mscorer = A->mscore = A->sd0 = A->sd1 = A->sd2 = A->sd = -99.9;
-	A->zscore = A->pscore = -99.9;
-	A->score = A->evalue = A->bitscore = -99.9;
-	return (A);
-}
-
-ALN *aln_pop(char *name1, char *name2, char *seq1, char *seq2, char *aln1, char *aln2)
-/* return a populated ALN object */
-{
-	ALN *A = aln_alloc();
-	if (name1) A->name1 = char_string(name1);
-	if (name2) A->name2 = char_string(name2);
-	if (seq1) A->seq1 = char_string(seq1);
-	if (seq2) A->seq2 = char_string(seq2);
-	if (aln1) A->aln1 = char_string(aln1);
-	if (aln2) A->aln2 = char_string(aln2);
-
-	/* do that with statistics here! */
-	return(A);
-}
-
 /* ALIGNMENT */
 
 double **pair_score_matrix(int fi, int fj)
@@ -1036,13 +994,78 @@ double compute_scoredistance(double ma, double mr, double m1, double m2, double 
 	return (sd);
 }
 
+/* ALN structure */
+typedef struct aln {
+	struct aln *next;
+	char *name1, *name2, *seq1, *seq2, *aln1, *aln2;	/* accession, sequence string and alignment string of each pair */
+	int len1, len2, start1, start2, end1, end2;		/* sequence lengths and start/end coordinates (1-based) */
+	int plen, alen, mlen, ilen, glen, olen, clen, nlen;	/* counts related to alignment */
+	double ascore, mscore, aprime, mprime, ab, mb, mscore1, mscore2, mscorer, mscorea, sd0, sd1, sd2, sd;	/* properties of the alignment */
+	double zscore, pscore;					/* related to CE alignments */
+	double score, evalue, bitscore;				/* related to BLAST alignemnts */
+} ALN;
+
+ALN *aln_alloc()
+/* return an allocated but empty ALN object */
+{
+	ALN *A = NULL;
+	if ((A = (ALN *) malloc(sizeof(ALN))) == NULL)
+		fprintf(stderr, "Could not allocate ALN object\n"), exit(1);
+	A->next = NULL;
+	A->name1 = A->name2 = A->seq1 = A->seq2 = A->aln1 = A->aln2 = NULL;
+	A->len1 = A->len1 = A->start1 = A->start2 = A->end1 = A->end2 = -1;
+	A->plen = A->alen = A->mlen = A->ilen = A->glen = A->olen = A->clen = A->nlen = 0;
+	A->ascore = A->mscore = A->aprime = A->mprime = A->ab = A->mb = A->mscore1 = A->mscore2 = A->mscorer = A->mscore = A->sd0 = A->sd1 = A->sd2 = A->sd = 0.0;
+	A->zscore = A->pscore = A->score = A->evalue = A->bitscore = -99.9;
+	return (A);
+}
+
+void aln_free(ALN *A)
+/* recursively call memory free of alignment object or list */
+{
+	ALN *N = A->next;
+	if (A->name1) free(A->name1), A->name1 = NULL;
+	if (A->name2) free(A->name2), A->name2 = NULL;
+	if (A->seq1) free(A->seq1), A->seq1 = NULL;
+	if (A->seq2) free(A->seq2), A->seq2 = NULL;
+	if (A->aln1) free(A->aln1), A->aln1 = NULL;
+	if (A->aln2) free(A->aln2), A->aln2 = NULL;
+	free((char *)A);
+	if (N)
+		aln_free(N);
+}
+
+ALN *aln_obj(char *name1, char *name2, char *seq1, char *seq2, char *aln1, char *aln2)
+/* return a populated ALN object */
+{
+	ALN *A = aln_alloc();
+	if (name1) A->name1 = char_string(name1);
+	if (name2) A->name2 = char_string(name2);
+	if (seq1) A->seq1 = char_string(seq1);
+	if (seq2) A->seq2 = char_string(seq2);
+	if (aln1) A->aln1 = char_string(aln1);
+	if (aln2) A->aln2 = char_string(aln2);
+	/* do that with statistics here! */
+	return(A);
+}
+
 
 int p_strict = 0;		/* set to 1, and no deviation is allowed in the recomputation of alignment score */
 
-double align_stats(char *name1, char *a1, char *name2, char *a2, int expected_plen, double expected_ascore)
+double align_stats(ALN *A, int expected_plen, double expected_ascore)
 /* produce alignment statistics and return score distance */
 {
-	//plen = count total padded length of alignment
+	if (A->aln1 == NULL) fprintf(stderr, "align_stats A->aln1 == NULL\n"), exit(1);
+	if (A->aln2 == NULL) fprintf(stderr, "align_stats A->aln2 == NULL\n"), exit(2);
+
+	// plen = count total (padded + gapped) length of alignment
+	if ((A->plen = strlen(A->aln1)) != strlen(A->aln2))
+		fprintf(stderr, "strlen(A->aln1) %ld != strlen(A->aln2) %ld\n%s\n%s\n", strlen(A->aln1), strlen(A->aln2), A->aln1, A->aln2), exit(1);
+
+	// I forgot the use case for testing plen == expected_plen ...
+	if (expected_plen > 0 && A->plen != expected_plen)
+		fprintf(stderr, "A->plen %d != expected_plen %d\n", A->plen, expected_plen), exit(1);
+
 	// alen = count aligned positions
 	// mlen = count matched positions
 	// ilen = count identical positions
@@ -1056,43 +1079,28 @@ double align_stats(char *name1, char *a1, char *name2, char *a2, int expected_pl
 	// mscore2 = sum sequence2 match score over aligned region
 	// mscorer = sum alignment random match score * /
 	//o1, o2 = 1 - based sequence offsets to start of local alignment
-	int plen, alen, mlen, ilen, glen, olen, clen, nlen, o1, o2, minlen;
-	double ascore, mscore, mscore1, mscore2, mscorer, scale, sd0, sd1, sd2, sd;
-
-	if (a1 == NULL || a2 == NULL)
-		fprintf(stderr, "alignment string a1 is NULL or a2 is NULL\n"), exit(1);
-	if ((plen = strlen(a1)) != strlen(a2))
-		fprintf(stderr, "strlen(a1) %ld != strlen(a2) %ld\n%s\n%s\n", strlen(a1), strlen(a2), a1, a2), exit(1);
-	if (expected_plen > 0 && plen != expected_plen)
-		fprintf(stderr, "plen %d != expected_plen %d\n", plen, expected_plen), exit(1);
-
-	/* initialize counting and score varibles */
-	alen = mlen = ilen = glen = olen = clen = nlen = 0;
-	mscore = mscore1 = mscore2 = mscorer = 0.0;
-	o1 = o2 = -1;
+	int o1 = -1, o2 = -1, minlen, i, isg = 0, n1 = 0, n2 = 0;
+	double scale, sd0, sd1, sd2, sd;
 
 	/* compute gaps and match scores from the alignment strings */
-	int i, isg = 0, n1 = 0, n2 = 0;	/* sequence positions n1 and n2 */
-	double s;
-	char a, b;
-
-	double sum_score = 0.0, gap_score;
-	for (i = 0; i < plen; i++) {
-		a = a1[i];
-		b = a2[i];
+	double sum_score = 0.0;
+	for (i = 0; i < A->plen; i++) {
+		char a = A->aln1[i];
+		char b = A->aln2[i];
+		/* track residue position n1 and n2 (1-based) */
 		if (a != ALIGN_PAD_CHAR && a != ALIGN_GAP_CHAR)
 			n1++;
 		if (b != ALIGN_PAD_CHAR && b != ALIGN_GAP_CHAR)
 			n2++;
-		s = scorematrix_element(a, b);
-		if (fabs(s) < 100)
-			sum_score += s;
-		if (p_v)
-			printf("p_go %g x olen %d + p_ge %g x (glen %d - olen %d)\n", p_go, olen, p_ge, glen, olen);
-		gap_score = p_go * (float)(olen) + p_ge * (float)(glen - olen);
-		if (p_v)
-			printf("stats plen %d : '%d%c' vs '%d%c' :  score %g, sumscore %g, gapscore %g, total_score %g\n",
+		double s = scorematrix_element(a, b);
+		if (p_v) {
+			printf("p_go %g x olen %d + p_ge %g x (glen %d - olen %d)\n", p_go, A->olen, p_ge, A->glen, A->olen);
+			if (fabs(s) < 100)
+				sum_score += s;
+			double gap_score = p_go * (float)(A->olen) + p_ge * (float)(A->glen - A->olen);
+			printf("aln[ %d ] : '%d%c' vs '%d%c' :  score %g, sumscore %g, gapscore %g, total_score %g\n",
 		       		i, n1, a, n2, b, s, sum_score, gap_score, (sum_score - gap_score));
+		}
 		/* ignore pad positions (outside of the local alignment) */
 		if (a == ALIGN_PAD_CHAR || b == ALIGN_PAD_CHAR)
 			continue;
@@ -1100,40 +1108,40 @@ double align_stats(char *name1, char *a1, char *name2, char *a2, int expected_pl
 		/* set offsets */
 		if (o1 < 0)
 			o1 = n1, o2 = n2;
-		alen++;
+		A->alen++;
 		if (a == ALIGN_GAP_CHAR || b == ALIGN_GAP_CHAR) {
-			glen++;
+			A->glen++;
 			if (!isg)
-				olen++;
+				A->olen++;
 			isg = 1;
 			continue;
 		}
 		/* matched positions */
-		mlen++;
+		A->mlen++;
 		if (a == b)
-			ilen++;
+			A->ilen++;
 		if (s > 0)
-			clen++;
+			A->clen++;
 		if (s >= 0)
-			nlen++;
-		mscore += s;
-		mscore1 += scorematrix_element(a, a);
-		mscore2 += scorematrix_element(b, b);
-		mscorer -= 1.0;	/* random match expectation */
+			A->nlen++;
+		A->mscore += s;
+		A->mscore1 += scorematrix_element(a, a);
+		A->mscore2 += scorematrix_element(b, b);
+		A->mscorer -= 1.0;	/* random match expectation */
 		isg = 0;
 	}
 	int error = 0;
-	double gapcost = olen * p_go + (glen - olen) * p_ge;
-	ascore = mscore - gapcost;
-	if (expected_ascore > 0.0 && ascore != expected_ascore) {
+	double gapcost = A->olen * p_go + (A->glen - A->olen) * p_ge;
+	A->ascore = A->mscore - gapcost;
+	if (expected_ascore > 0.0 && A->ascore != expected_ascore) {
 		if (p_v)
-			fprintf(stderr, "Pair %s %s computed ascore %g != expected %g\n", name1, name2, ascore, expected_ascore);
+			fprintf(stderr, "Pair %s %s computed A->ascore %g != expected %g\n", A->name1, A->name2, A->ascore, expected_ascore);
 		if (p_strict)
 			fprintf(stderr, "Exiting in p_strict mode\n"), exit(1);
-		double g = sqrt((ascore - expected_ascore) * (ascore - expected_ascore)) / (0.5 * (ascore + expected_ascore));
+		double g = sqrt((A->ascore - expected_ascore) * (A->ascore - expected_ascore)) / (0.5 * (A->ascore + expected_ascore));
 		if (p_v)
-			fprintf(stderr, "Pair %s %s, g = |D|/A %g, ascore %g, expected %g, D %g, A %g\n",
-				name1, name2, g, ascore, expected_ascore, (ascore - expected_ascore), 0.5 * (ascore + expected_ascore));
+			fprintf(stderr, "Pair %s %s, g = |D|/A %g, A->ascore %g, expected %g, D %g, A %g\n",
+				A->name1, A->name2, g, A->ascore, expected_ascore, (A->ascore - expected_ascore), 0.5 * (A->ascore + expected_ascore));
 #define MAXG 0.01
 		if (g > MAXG)
 			if (p_v)
@@ -1142,21 +1150,21 @@ double align_stats(char *name1, char *a1, char *name2, char *a2, int expected_pl
 
 	/* compute score distances */
 	/* original score distance of Sonhammer & Hollich normalized to alignment length */
-	scale = (double)alen / (double)mlen;
-	sd0 = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
+	scale = (double)(A->alen) / (double)(A->mlen);
+	sd0 = compute_scoredistance(A->mscore, A->mscorer, A->mscore1, A->mscore2, scale);
 
 	/* normalize to first sequence length */
-	scale = (double)n1 / (double)mlen;
-	sd1 = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
+	scale = (double)n1 / (double)(A->mlen);
+	sd1 = compute_scoredistance(A->mscore, A->mscorer, A->mscore1, A->mscore2, scale);
 
 	/* normalize to second sequence length */
-	scale = (double)n2 / (double)mlen;
-	sd2 = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
+	scale = (double)n2 / (double)(A->mlen);
+	sd2 = compute_scoredistance(A->mscore, A->mscorer, A->mscore1, A->mscore2, scale);
 
 	/* preferred score distance to minimum length */
 	minlen = (n1 < n2 ? n1 : n2);
-	scale = (double)minlen / (double)mlen;
-	sd = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
+	scale = (double)minlen / (double)(A->mlen);
+	sd = compute_scoredistance(A->mscore, A->mscorer, A->mscore1, A->mscore2, scale);
 
 	/* TODO: reintroduce the ALN data structure which contains the entire pairwise alignment
 		then call to write it to JSON
@@ -1192,29 +1200,29 @@ double align_stats(char *name1, char *a1, char *name2, char *a2, int expected_pl
 		/* JSON format parsable line-by-line */
 		j_osb(jsnfp);
 		/* input */
-		j_str(jsnfp, YES, "name1", name1, NULL, NULL);
+		j_str(jsnfp, YES, "name1", A->name1, NULL, NULL);
 		j_int(jsnfp, YES, "len1", n1, NULL, NULL);
-		j_str(jsnfp, YES, "name2", name2, NULL, NULL);
+		j_str(jsnfp, YES, "name2", A->name2, NULL, NULL);
 		j_int(jsnfp, YES, "len2", n2, NULL, NULL);
 		/* alignment strings */
-		j_str(jsnfp, YES, "aln1", a1, NULL, NULL);
+		j_str(jsnfp, YES, "aln1", A->aln1, NULL, NULL);
 		j_int(jsnfp, YES, "o1", o1, NULL, NULL);
-		j_str(jsnfp, YES, "aln2", a2, NULL, NULL);
+		j_str(jsnfp, YES, "aln2", A->aln2, NULL, NULL);
 		j_int(jsnfp, YES, "o2", o2, NULL, NULL);
 		/* alignment counts and scores */
-		j_int(jsnfp, YES, "plen", plen, NULL, NULL);
-		j_int(jsnfp, YES, "alen", alen, NULL, NULL);
-		j_int(jsnfp, YES, "mlen", mlen, NULL, NULL);
-		j_int(jsnfp, YES, "ilen", ilen, NULL, NULL);
-		j_int(jsnfp, YES, "glen", glen, NULL, NULL);
-		j_int(jsnfp, YES, "olen", olen, NULL, NULL);
-		j_int(jsnfp, YES, "clen", clen, NULL, NULL);
-		j_int(jsnfp, YES, "nlen", nlen, NULL, NULL);
-		j_dbl(jsnfp, YES, "ascore", ascore, NULL, NULL);
-		j_dbl(jsnfp, YES, "mscore", mscore, NULL, NULL);
-		j_dbl(jsnfp, YES, "mscore1", mscore1, NULL, NULL);
-		j_dbl(jsnfp, YES, "mscore2", mscore2, NULL, NULL);
-		j_dbl(jsnfp, YES, "mscorer", mscorer, NULL, NULL);
+		j_int(jsnfp, YES, "plen", A->plen, NULL, NULL);
+		j_int(jsnfp, YES, "alen", A->alen, NULL, NULL);
+		j_int(jsnfp, YES, "mlen", A->mlen, NULL, NULL);
+		j_int(jsnfp, YES, "ilen", A->ilen, NULL, NULL);
+		j_int(jsnfp, YES, "glen", A->glen, NULL, NULL);
+		j_int(jsnfp, YES, "olen", A->olen, NULL, NULL);
+		j_int(jsnfp, YES, "clen", A->clen, NULL, NULL);
+		j_int(jsnfp, YES, "nlen", A->nlen, NULL, NULL);
+		j_dbl(jsnfp, YES, "ascore", A->ascore, NULL, NULL);
+		j_dbl(jsnfp, YES, "mscore", A->mscore, NULL, NULL);
+		j_dbl(jsnfp, YES, "mscore1", A->mscore1, NULL, NULL);
+		j_dbl(jsnfp, YES, "mscore2", A->mscore2, NULL, NULL);
+		j_dbl(jsnfp, YES, "mscorer", A->mscorer, NULL, NULL);
 		/* score distances */
 		j_dbl(jsnfp, YES, "sd0", sd0, NULL, NULL);
 		j_dbl(jsnfp, YES, "sd1", sd1, NULL, NULL);
@@ -1232,14 +1240,14 @@ double align_stats(char *name1, char *a1, char *name2, char *a2, int expected_pl
 			free(filename);
 		}
 		/* free-form text */
-		fprintf(alnfp, "Align %s %d x %s %d", name1, n1, name2, n2);
+		fprintf(alnfp, "Align %s %d x %s %d", A->name1, n1, A->name2, n2);
 		fprintf(alnfp, " O1 %d O2 %d", o1, o2);
 		fprintf(alnfp, " Plen %d Alen %d Mlen %d Ilen %d Glen %d Olen %d Clen %d Nlen %d",
-			plen, alen, mlen, ilen, glen, olen, clen, nlen);
-		fprintf(alnfp, " Ascore %f Mscore %f", ascore, mscore);
-		fprintf(alnfp, " M1 %g M2 %g MR %g", mscore1, mscore2, mscorer);
+			A->plen, A->alen, A->mlen, A->ilen, A->glen, A->olen, A->clen, A->nlen);
+		fprintf(alnfp, " Ascore %f Mscore %f", A->ascore, A->mscore);
+		fprintf(alnfp, " M1 %g M2 %g MR %g", A->mscore1, A->mscore2, A->mscorer);
 		fprintf(alnfp, " SD0 %g SD1 %g SD2 %g SD %g\n", sd0, sd1, sd2, sd);
-		fprintf(alnfp, "%s\n%s\n", a1, a2);
+		fprintf(alnfp, "%s\n%s\n", A->aln1, A->aln2);
 		fprintf(alnfp, "\n");	/* extra newline for human readability */
 		fflush(alnfp);
 	}
@@ -1258,7 +1266,9 @@ double pair_malign(int fi, int fj)
 {
 	/* pre-aligned fasta sequences */
 	char *a1 = fseq[fi], *a2 = fseq[fj];
-	double d = align_stats(facc[fi], a1, facc[fj], a2, -1, -1.0);
+	ALN *A = aln_obj(facc[fi], facc[fj], NULL, NULL, fseq[fi], fseq[fj]);
+	double d = align_stats(A, -1, -1.0);
+	aln_free(A);
 	return (d);
 }
 
@@ -1284,8 +1294,12 @@ double pair_align(int fi, int fj)
 	/* generate alignment strings */
 	align_strings(facc[fi], n1, facc[fj], n2, sx, mx, o1, o2, s1, s2, &a1, &a2, align_flag);
 
+	ALN *A = aln_obj(facc[fi], facc[fj], s1, s2, a1, a2);
+
 	/* compute alignment statistics */
-	double d = align_stats(facc[fi], a1, facc[fj], a2, plen, ascore);
+	double d = align_stats(A, plen, ascore);
+
+	aln_free(A);
 
 	/* memory free */
 	free(a1);
