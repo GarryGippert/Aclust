@@ -633,6 +633,48 @@ void read_fasta(char *filename)
 		print_fasta();
 }
 
+/* ALN structure */
+typedef struct aln {
+	struct aln *next;
+	char *name1, *name2, *seq1, *seq2, *aln1, *aln2;	/* accession, sequence string and alignment string of each pair */
+	int len1, len2, start1, start2, end1, end2;		/* sequence lengths and start/end coordinates (1-based) */
+	int plen, alen, mlen, ilen, glen, olen, clen, nlen;	/* counts related to alignment */
+	double ascore, mscore, aprime, mprime, ab, mb, mscore1, mscore2, mscorer, mscorea, sd0, sd1, sd2, sd;	/* properties of the alignment */
+	double zscore, pscore;					/* related to CE alignments */
+	double score, evalue, bitscore;				/* related to BLAST alignemnts */
+} ALN;
+
+ALN *aln_alloc()
+/* return an allocated but empty ALN object */
+{
+	ALN *A = NULL;
+	if ((A = (ALN *) malloc(sizeof(ALN))) == NULL)
+		fprintf(stderr, "Could not allocate ALN object\n"), exit(1);
+	A->next = NULL;
+	A->name1 = A->name2 = A->seq1 = A->seq2 = A->aln1 = A->aln2 = NULL;
+	A->len1 = A->len1 = A->start1 = A->start2 = A->end1 = A->end2 = -1;
+	A->plen = A->alen = A->mlen = A->ilen = A->glen = A->olen = A->clen = A->nlen = 0;
+	A->ascore = A->mscore = A->aprime = A->mprime = A->ab = A->mb = A->mscore1 = A->mscore2 = A->mscorer = A->mscore = A->sd0 = A->sd1 = A->sd2 = A->sd = -99.9;
+	A->zscore = A->pscore = -99.9;
+	A->score = A->evalue = A->bitscore = -99.9;
+	return (A);
+}
+
+ALN *aln_pop(char *name1, char *name2, char *seq1, char *seq2, char *aln1, char *aln2)
+/* return a populated ALN object */
+{
+	ALN *A = aln_alloc();
+	if (name1) A->name1 = char_string(name1);
+	if (name2) A->name2 = char_string(name2);
+	if (seq1) A->seq1 = char_string(seq1);
+	if (seq2) A->seq2 = char_string(seq2);
+	if (aln1) A->aln1 = char_string(aln1);
+	if (aln2) A->aln2 = char_string(aln2);
+
+	/* do that with statistics here! */
+	return(A);
+}
+
 /* ALIGNMENT */
 
 double **pair_score_matrix(int fi, int fj)
@@ -1116,6 +1158,27 @@ double align_stats(char *name1, char *a1, char *name2, char *a2, int expected_pl
 	scale = (double)minlen / (double)mlen;
 	sd = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
 
+	/* TODO: reintroduce the ALN data structure which contains the entire pairwise alignment
+		then call to write it to JSON
+		and call to write it to TALN (text alignment)
+		and call to write it to BALN (binary alignment)
+
+	   It might be better to decouple (again) alignment generation from tree generation.
+		for example after writing the binary aligment to read it again as a way
+		of determining the distance matrix, rather than populating the distance matrix
+		one alignment at a time.
+
+	   This would need to be tied into reading a distance matrix.
+
+	   This would also need to be reconciled with reading a multiple alignment. Does it really make sense
+	   to save the multiple alignment as an entire set of pairwise alignments? Spacewise not.
+
+	   Eventually we could skip the text output, as it is a legacy format not part of any current workflow.
+	   However, in case people have ever seen this code and use it, maybe the ascii part could be kept.
+
+	   GarryG March 17, 2025
+	*/
+
 	/* write alignments */
 	if (p_json) {
 		if (! jsnfp) {
@@ -1425,7 +1488,7 @@ typedef struct bnode {
 
 BNODE *bnode_alloc(BNODE * parent, int index)
 {
-	BNODE *B;
+	BNODE *B = NULL;
 	if ((B = (BNODE *) malloc(sizeof(BNODE))) != NULL) {
 		B->left = NULL;
 		B->right = NULL;
