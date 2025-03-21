@@ -433,6 +433,81 @@ int nb = 0;
 #define MAXN 30
 char alphabet[MAXN];
 
+double blosum_zscore(double mscore, int mlen)
+/* Compute Blosum62 Zscore from average random Blosum score = -mlen, and stddev score = 2 n^0.5,
+	for gapless fragments, unclear to use ascore or mscore */
+{
+        if (mlen <= 0) 
+                return (-99.9); 
+        return ((mscore + (double) mlen) / (2.0 * sqrt((double) mlen)));
+}
+
+static int print_blosum_pscore_parameters = 0;
+
+double blosum_pscore(double zscore, int qlen)
+/* Pscore = -log10(Pvalue). from extreme value distrubution.
+   Probability of Zscore P(z)
+        P(z) = exp[(A-z)/B - exp[(A-z)/B]]/B
+        D(z) = exp[- exp[(A-z)/B]]
+   where
+        A = 3.30  + 0.387  * ln(qlen);
+        B = 0.393 + 0.0585 * ln(qlen);
+   The probability that zscore >= z is given by 1 - D(z).
+   We put this in -log10 units.
+   LARGER PSCORE IS BETTER.  GPG 040614
+*/
+{
+        if (qlen < 0)
+                return 0.0;
+
+	/* Extreme value distribution constants to three sig figs */
+#define EVD_A_CONST 3.30
+#define EVD_A_SLOPE 0.387
+#define EVD_B_CONST 0.393
+#define EVD_B_SLOPE 0.0585
+        double A = EVD_A_CONST + EVD_A_SLOPE * log((double) qlen);
+        double B = EVD_B_CONST + EVD_B_SLOPE * log((double) qlen);
+        double P = exp((A - zscore) / B - exp((A - zscore) / B)) / B;
+        double D = exp(-exp((A - zscore) / B));
+
+        /* limit of pscore resolution */
+#define PSCORE_LIMIT 1.0e-15
+        double f = 1.0 - D;
+        f = (f > PSCORE_LIMIT ? f : PSCORE_LIMIT);
+        double S = -log10(f);
+#ifdef DEBUG
+        printf("# blosum_pscore Z %f Q %d A %g B %g P %g D %g => S %g\n",
+               zscore, qlen, A, B, P, D, S);
+#endif
+
+        /* print parameters once */
+        if (!print_blosum_pscore_parameters) {
+                printf("# Blosum PSCORE parameters:\n");
+                printf("# Q = %d\n", qlen);
+                printf("# A = EVD_A_CONST %g + EVD_A_SLOPE %g * log(Q) = %g\n", EVD_A_CONST, EVD_A_SLOPE, A);
+                printf("# B = EVD_B_CONST %g + EVD_B_SLOPE %g * log(Q) = %g\n", EVD_B_CONST, EVD_B_SLOPE, B);
+                printf("# Z = %g\n", zscore);
+                printf("# P = exp((A - Z)/B - exp((A - Z)/B))/B = %g\n", P);
+                printf("# D = exp(-exp((A - Z)/B)) = %g\n", D);
+                printf("# S = -log10(1.0 - D) = %g (blosum pscore)\n", S);
+                print_blosum_pscore_parameters++;
+        }
+        return (S);
+}
+
+static double g_lambda = 0.267000;
+static double g_kappa = 0.041000;
+
+double natscore(double score)
+{
+        return (score * g_lambda - log(g_kappa));
+}               
+                        
+double bitscore(double score)
+{
+        return (natscore(score) / log(2.0));
+} 
+
 int apos(char c)
 /* return index of character c in scorematrix alphabet */
 {
@@ -642,10 +717,16 @@ double **pair_score_matrix(int fi, int fj)
 {
 	char *si = fseq[fi], *sj = fseq[fj];
 	int i, j, ni = strlen(si), nj = strlen(sj);
-	double **m = double_matrix(ni, nj);
+	double **m = double_matrix(ni+1, nj+1);
+	/* body of score matrix contains sequence I vs sequence J substitutions */
 	for (i = 0; i < ni; i++)
 		for (j = 0; j < nj; j++)
 			m[i][j] = scorematrix_element(si[i], sj[j]);
+	/* edges of score matrix contain sequence I and sequence J self-scores */
+	for (i = 0; i < ni; i++)
+		m[i][nj] = scorematrix_element(si[i], si[i]);
+	for (j = 0; j < nj; j++)
+		m[ni][j] = scorematrix_element(sj[j], sj[j]);
 	return (m);
 }
 
@@ -858,146 +939,6 @@ int align_index(int n1, int n2, double **S, double **M, int o1, int o2, int **d1
 	return (plen);
 }
 
-void align_strings(char *name1, int n1, char *name2, int n2, double **S, double **M, int o1, int o2, char *s1, char *s2, char **a1, char **a2, int align_flag)
-/* produce padded alignment strings *a1 and *a2 */
-{
-	int k, l, nk, nl, bk, bl, i, plen = 0;
-	double max, tmp;
-	char *t1, *t2;
-	if (p_v)
-		printf("Alignment strings between %s (%d) and %s (%d)\n", name1, n1, name2, n2);
-	(*a1) = NULL;
-	(*a2) = NULL;
-	if (o1 == -1 || o2 == -1)
-		return;
-
-	/* tmp space for accumulating alignment strings */
-	t1 = char_vector(n1 + n2 + 2);
-	t2 = char_vector(n1 + n2 + 2);
-
-	/* optional pad N-terminal with non-aligned regions */
-	if (align_flag & ALIGN_PAD) {
-		for (k = 0; k < o1; k++) {
-			t1[plen] = s1[k];
-			t2[plen] = ALIGN_PAD_CHAR;
-			plen++;
-		}
-		for (l = 0; l < o2; l++) {
-			t1[plen] = ALIGN_PAD_CHAR;
-			t2[plen] = s2[l];
-			plen++;
-		}
-	}
-
-	/* first match */
-	k = o1;
-	l = o2;
-
-	while (1) {
-		/* align state, plen is 'padded' aka full length alignment strings */
-		t1[plen] = s1[k];
-		t2[plen] = s2[l];
-		double scoreelement = scorematrix_element(t1[plen], t2[plen]);
-		if (p_v)
-			printf("aln plen %d K %3d%c  vs L  %3d%c,  score %g\n",
-			       plen, k, s1[k], l, s2[l], scoreelement);
-		plen++;
-
-		/* next k,l */
-		nk = k + 1;
-		nl = l + 1;
-		if (nk >= n1 || nl >= n2)
-			break;
-
-		/* match state */
-		bk = nk;
-		bl = nl;
-		max = M[nk][nl];
-		if (max <= 0.0)
-			break;
-
-		/* gap in column ? */
-		for (i = nk + 1; i < n1; i++) {
-			tmp = M[i][nl] - p_go - p_ge * (i - nk - 1);
-			if (tmp > max) {
-				max = tmp;
-				bk = i;
-			}
-		}
-
-		/* gap in row ? */
-		for (i = nl + 1; i < n2; i++) {
-			tmp = M[nk][i] - p_go - p_ge * (i - nl - 1);
-			if (tmp > max) {
-				max = tmp;
-				bl = i;
-			}
-		}
-
-		if (align_flag & ALIGN_GAP) {
-			/* insert column gaps in strings */
-			for (i = nk; i < bk; i++) {
-				t1[plen] = s1[i];
-				t2[plen] = ALIGN_GAP_CHAR;
-				plen++;
-			}
-
-			/* insert row gaps in strings */
-			for (i = nl; i < bl; i++) {
-				t1[plen] = ALIGN_GAP_CHAR;
-				t2[plen] = s2[i];
-				plen++;
-			}
-		}
-
-		/* last best position */
-		k = bk;
-		l = bl;
-	}
-
-	/* optional pad C-terminal with non-aligned regions */
-	if (align_flag & ALIGN_PAD) {
-		for (i = nk; i < n1; i++) {
-			t1[plen] = s1[i];
-			t2[plen] = ALIGN_PAD_CHAR;
-			plen++;
-		}
-		for (i = nl; i < n2; i++) {
-			t1[plen] = ALIGN_PAD_CHAR;
-			t2[plen] = s2[i];
-			plen++;
-		}
-	}
-
-	/* politely terminate strings */
-	t1[plen] = 0;
-	t2[plen] = 0;
-
-	/* return first alignment in string of length plen */
-	(*a1) = char_string(t1);
-	free(t1);
-
-	/* return second alignment in string of length plen */
-	(*a2) = char_string(t2);
-	free(t2);
-}
-
-#define MAXSCOREDIST 9999.9
-double compute_scoredistance(double ma, double mr, double m1, double m2, double scale)
-{
-	double num = ma - (mr * scale);
-	double den = ((m1 + m2) / 2.0 - mr) * scale;
-	double e = num / den, sd;
-	if (e <= 0.0) {
-		fprintf(stderr, "scoredist: e %g <= 0.0, set dist to MAXSCOREDIST %g\n", e, MAXSCOREDIST);
-		sd = MAXSCOREDIST;
-	}
-	else {
-		sd = -log(e) * 100;
-	}
-	return (sd);
-}
-
 /* ALN structure */
 typedef struct aln {
 	struct aln *next;
@@ -1143,6 +1084,360 @@ void aln_write_binary(ALN *A)
 /* stub for writing aln binary, requires that blnfp is initially NULL */
 {
 	return;
+}
+
+#define MAXSCOREDIST 9999.9
+double compute_scoredistance(double ma, double mr, double m1, double m2, double scale)
+/* unpublished Gippert, G.P, ca 2009, sequence-length normalization of ScoreDist from Sohnhammer & Hollich 2005 */
+{
+	double num = ma - (mr * scale);
+	double den = ((m1 + m2) / 2.0 - mr) * scale;
+	double e = num / den, sd;
+	if (e <= 0.0) {
+		fprintf(stderr, "scoredist: e %g <= 0.0, set dist to MAXSCOREDIST %g\n", e, MAXSCOREDIST);
+		sd = MAXSCOREDIST;
+	}
+	else {
+		sd = -log(e) * 100;
+	}
+	return (sd);
+}
+
+/* Find alignment from cumultative matching scores */
+ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, double **S, double **M, int align_flag)
+/* return match score and indirectly *alen and alignment strings *a1 and *a2 */
+{
+	char *aln1, *aln2, *t1, *t2;
+	int plen, alen, mlen, ilen, glen, olen, clen, nlen, i, j, k, l, nk, nl;
+	double max, tmp, *scovec, ascore, gscore, mscore, mscore1, mscore2, mscorer, zs, ps;
+	ALN *a = NULL;
+
+	if (o1 != -1 && o2 != -1) {
+		aln1 = aln2 = NULL;
+		plen = alen = mlen = ilen = glen = olen = clen = nlen = 0;
+		ascore = gscore = mscore = mscore1 = mscore2 = mscorer = ps = 0.0;
+		zs = -99.9;
+#ifdef SCOVEC
+		scovec = double_vector(0, len1 + len2);
+#endif
+		t1     = char_vector(len1 + len2 + 2);
+		t2     = char_vector(len1 + len2 + 2);
+#define PADENDS
+#ifdef PADENDS
+		for (i = 0; i < o1; i++) {
+			t1[plen] = seq1[i];
+			t2[plen] = ALIGN_PAD_CHAR;
+#ifdef SCOVEC
+			scovec[plen] = -2.0;
+#endif
+			plen++;
+		}
+		for (j = 0; j < o2; j++) {
+			t1[plen] = ALIGN_PAD_CHAR;
+			t2[plen] = seq2[j];
+#ifdef SCOVEC
+			scovec[plen] = -2.0;
+#endif
+			plen++;
+		}
+#endif
+
+		/* inject first aligned position into score, counts and alignment strings */
+		k = o1;
+		l = o2;
+		mscore  += S[k][l];
+		mscore1 += S[k][len2];
+		mscore2 += S[len1][l];
+		mscorer -= 1.0;
+		t1[plen] = seq1[k];
+		t2[plen] = seq2[l];
+#ifdef SCOVEC
+		scovec[plen] = S[k][l];
+#endif
+		max = M[k][l];
+		plen++;
+		alen++;
+		mlen++;
+		/* count identical, conserved, and non-negative matches) */
+		if (seq1[k] == seq2[l])
+			ilen++;
+		if (S[k][l] > 0.0)
+			clen++;
+		if (S[k][l] >= 0.0)
+			nlen++;
+
+		while ((k != len1 - 1) && (l != len2 - 1) && max > 0) {
+			/* Find best scores */
+			nk = k + 1;
+			nl = l + 1;
+			max = M[nk][nl];
+			/* gap in column */
+			for (i = k + 2; i < len1; i++) {
+				tmp = M[i][l + 1] - p_go - 1.0 * (i - (k + 2)) * p_ge;
+				if (tmp > max) {
+					max = tmp;
+					nk = i;
+					nl = l + 1;
+				}
+			}
+			/* gap in row */
+			for (j = l + 2; j < len2; j++) {
+				tmp = M[k + 1][j] - p_go - 1.0 * (j - (l + 2)) * p_ge;
+				if (tmp > max) {
+					max = tmp;
+					nk = k + 1;
+					nl = j;
+				}
+			}
+#define CROSSOVERGAP
+#ifdef CROSSOVERGAP
+			/* cross-over gap in both column and row ? */
+			for (i = k + 1; i < len1; i++)
+			for (j = l + 1; j < len2; j++) {
+				int g = i - (k + 1) + j - (l + 1);
+				tmp = M[i][j] - (g ? p_go + p_ge * (g - 1) : 0.0);
+				if (tmp > max) {
+					max = tmp;
+					nk = i;
+					nl = j;
+				}
+			}
+#endif
+			if (max > 0) {
+				/* Insert gaps */
+				for (i = k + 1; i < nk; i++) {
+					t1[plen] = seq1[i];
+					t2[plen] = '-';
+					plen++;
+					alen++;
+				}
+				for (j = l + 1; j < nl; j++) {
+					t1[plen] = '-';
+					t2[plen] = seq2[j];
+					plen++;
+					alen++;
+				}
+				/* and update gap/open count and total gapscore (penalty) */
+				int g = (nk - k - 1) + (nl - l - 1);
+				glen += g;
+				olen += (g > 0 ? 1 : 0);
+				gscore += (g > 0 ? p_go + (g - 1) * p_ge : 0.0);
+
+				/* inject next match position into score, counts and alignment strings */
+				k = nk;
+				l = nl;
+				mscore  += S[k][l];
+				mscore1 += S[k][len2];
+				mscore2 += S[len1][l];
+				mscorer -= 1.0;
+				t1[plen] = seq1[k];
+				t2[plen] = seq2[l];
+#ifdef SCOVEC
+				scovec[plen] = S[k][l];
+#endif
+				max = M[k][l];
+				plen++;
+				alen++;
+				mlen++;
+				/* count identical, conserved, and non-negative matches) */
+				if (seq1[k] == seq2[l])
+					ilen++;
+				if (S[k][l] > 0.0)
+					clen++;
+				if (S[k][l] >= 0.0)
+					nlen++;
+
+			}
+		}
+#ifdef PADENDS
+		for (i = nk; i < o1; i++) {
+			t1[plen] = seq1[i];
+			t2[plen] = ALIGN_PAD_CHAR;
+#ifdef SCOVEC
+			scovec[plen] = -2.0;
+#endif
+			plen++;
+		}
+		for (j = nl; i < o2; j++) {
+			t1[plen] = ALIGN_PAD_CHAR;
+			t2[plen] = seq2[j];
+#ifdef SCOVEC
+			scovec[plen] = -2.0;
+#endif
+			plen++;
+		}
+#endif
+		/* terminate alignment strings */
+		t1[plen] = 0;
+		t2[plen] = 0;
+#ifdef SCOVEC
+		double_vector_free(len1 + len2, scovec);
+#endif
+
+		fprintf(stderr, "MSCORE %g MSCORE1 %g MSCORE2 %g MSCORER %g\n", mscore, mscore1, mscore2, mscorer);
+
+		if (mlen > 0) {
+			zs = blosum_zscore(mscore, mlen);
+			/* the 'query' length is arbitrarily defined as the length
+		   	of the first sequence */
+			if (zs > 0.0)
+				ps = blosum_pscore(zs, len1);
+		}
+
+		/* ALIGN contains copy of input sequences */
+		if ((a = aln_alloc()) == NULL)
+			fprintf(stderr, "cannot allocate ALN\n"), exit(1);
+		a->len1 = len1;
+		a->seq1 = char_string(seq1);
+		a->len2 = len2;
+		a->seq2 = char_string(seq2);
+		a->start1 = o1, a->start2 = o2;
+		a->end1 = nk, a->end2 = nl;
+		a->aln1 = char_string(t1), free(t1);
+		a->aln2 = char_string(t2), free(t2);
+		a->plen = plen, a->alen = alen, a->mlen = mlen, a->glen = glen, a->ilen = ilen, a->olen = olen, a->clen = clen, a->nlen = nlen;
+		a->gapcost = gscore, a->ascore = mscore - gscore, a->mscore = mscore, a->aprime = natscore(ascore), a->mprime = natscore(mscore), a->ab = bitscore(ascore), a->mb = bitscore(mscore), a->zscore = zs, a->pscore = ps;
+
+		/* compute score distances */
+		// normalized to shortest
+		int minlen = (len1 < len2 ? len1 : len2);
+		double scale =  (double)minlen/(double)mlen;
+		a->sd = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
+		// normalized to sequence1 length
+		scale = (double)len1/(double)mlen;
+		a->sd1 = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
+		// normalize to sequence2 length
+		scale = (double)len2/(double)mlen;
+		a->sd2 = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
+		// normalize to alignment length (original Sohnhammer Scoredist)
+		scale = (double)alen/(double)mlen;
+		a->sd0 = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
+	}
+	return(a);
+}
+
+void align_strings(char *name1, int n1, char *name2, int n2, double **S, double **M, int o1, int o2, char *s1, char *s2, char **a1, char **a2, int align_flag)
+/* produce padded alignment strings *a1 and *a2 */
+{
+	int k, l, nk, nl, bk, bl, i, plen = 0;
+	double max, tmp;
+	char *t1, *t2;
+	if (p_v)
+		printf("Alignment strings between %s (%d) and %s (%d)\n", name1, n1, name2, n2);
+	(*a1) = NULL;
+	(*a2) = NULL;
+	if (o1 == -1 || o2 == -1)
+		return;
+
+	/* tmp space for accumulating alignment strings */
+	t1 = char_vector(n1 + n2 + 2);
+	t2 = char_vector(n1 + n2 + 2);
+
+	/* optional pad N-terminal with non-aligned regions */
+	if (align_flag & ALIGN_PAD) {
+		for (k = 0; k < o1; k++) {
+			t1[plen] = s1[k];
+			t2[plen] = ALIGN_PAD_CHAR;
+			plen++;
+		}
+		for (l = 0; l < o2; l++) {
+			t1[plen] = ALIGN_PAD_CHAR;
+			t2[plen] = s2[l];
+			plen++;
+		}
+	}
+
+	/* first match */
+	k = o1;
+	l = o2;
+
+	while (1) {
+		/* align state, plen is 'padded' aka full length alignment strings */
+		t1[plen] = s1[k];
+		t2[plen] = s2[l];
+		double scoreelement = scorematrix_element(t1[plen], t2[plen]);
+		if (p_v)
+			printf("aln plen %d K %3d%c  vs L  %3d%c,  score %g\n",
+			       plen, k, s1[k], l, s2[l], scoreelement);
+		plen++;
+
+		/* next k,l */
+		nk = k + 1;
+		nl = l + 1;
+		if (nk >= n1 || nl >= n2)
+			break;
+
+		/* match state */
+		bk = nk;
+		bl = nl;
+		max = M[nk][nl];
+		if (max <= 0.0)
+			break;
+
+		/* gap in column ? */
+		for (i = nk + 1; i < n1; i++) {
+			tmp = M[i][nl] - p_go - p_ge * (i - nk - 1);
+			if (tmp > max) {
+				max = tmp;
+				bk = i;
+			}
+		}
+
+		/* gap in row ? */
+		for (i = nl + 1; i < n2; i++) {
+			tmp = M[nk][i] - p_go - p_ge * (i - nl - 1);
+			if (tmp > max) {
+				max = tmp;
+				bl = i;
+			}
+		}
+
+		if (align_flag & ALIGN_GAP) {
+			/* insert column gaps in strings */
+			for (i = nk; i < bk; i++) {
+				t1[plen] = s1[i];
+				t2[plen] = ALIGN_GAP_CHAR;
+				plen++;
+			}
+
+			/* insert row gaps in strings */
+			for (i = nl; i < bl; i++) {
+				t1[plen] = ALIGN_GAP_CHAR;
+				t2[plen] = s2[i];
+				plen++;
+			}
+		}
+
+		/* last best position */
+		k = bk;
+		l = bl;
+	}
+
+	/* optional pad C-terminal with non-aligned regions */
+	if (align_flag & ALIGN_PAD) {
+		for (i = nk; i < n1; i++) {
+			t1[plen] = s1[i];
+			t2[plen] = ALIGN_PAD_CHAR;
+			plen++;
+		}
+		for (i = nl; i < n2; i++) {
+			t1[plen] = ALIGN_PAD_CHAR;
+			t2[plen] = s2[i];
+			plen++;
+		}
+	}
+
+	/* politely terminate strings */
+	t1[plen] = 0;
+	t2[plen] = 0;
+
+	/* return first alignment in string of length plen */
+	(*a1) = char_string(t1);
+	free(t1);
+
+	/* return second alignment in string of length plen */
+	(*a2) = char_string(t2);
+	free(t2);
 }
 
 int p_strict = 0;		/* set to 1, and no deviation is allowed in the recomputation of alignment score */
@@ -1326,19 +1621,12 @@ double pair_align(int fi, int fj)
 	/* revisit alignment and compute total padded alignment length */
 	int plen = align_index(n1, n2, sx, mx, o1, o2, &d1, &d2, align_flag);
 
-	/* generate alignment strings */
-	align_strings(facc[fi], n1, facc[fj], n2, sx, mx, o1, o2, s1, s2, &a1, &a2, align_flag);
+	ALN *A = align_ali(s1, s2, n1, n2, o1, o2, sx, mx, align_flag);
+	A->name1 = char_string(facc[fi]);
+	A->name2 = char_string(facc[fj]);
 
-	ALN *A = aln_obj(facc[fi], facc[fj], s1, s2, a1, a2);
-	free((char *)a1);
-	free((char *)a2);
-	int_vector_free(plen, d1);
-	int_vector_free(plen, d2);
-	double_matrix_free(n1, n2, sx);
+	double_matrix_free(n1+1, n2+1, sx);
 	double_matrix_free(n1, n2, mx);
-
-	/* retrieve align stats and score distance */
-	align_stats(A, plen, ascore);
 	double d = A->sd;
 
 	/* write alignments */
