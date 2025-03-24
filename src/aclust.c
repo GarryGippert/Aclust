@@ -1316,7 +1316,6 @@ double pair_malign(int fi, int fj)
 	char *a1 = fseq[fi], *a2 = fseq[fj];
 	ALN *A = aln_obj(facc[fi], facc[fj], NULL, NULL, fseq[fi], fseq[fj]);
 	align_stats(A, -1, -1.0);
-	double d = A->sd;
 
 	/* write alignments */
 	if (p_json)
@@ -1326,6 +1325,7 @@ double pair_malign(int fi, int fj)
 	if (p_baln)
 		aln_write_binary(A);
 
+	double d = A->sd;
 	aln_free(A);
 	return (d);
 }
@@ -1345,16 +1345,12 @@ double pair_align(int fi, int fj)
 
 	/* compute optimal alignment and alignment score */
 	double ascore = align_score(s1, s2, n1, n2, sx, mx, p_go, p_ge, &o1, &o2, align_flag);
-	printf("ASCORE %g n1 %d n2 %d o1 %d o2 %d acc1 %s acc2 %s\n",
-		ascore, n1, n2, o1, o2, facc[fi], facc[fj]);
-
 	ALN *A = align_ali(s1, s2, n1, n2, o1, o2, sx, mx, align_flag);
 	A->name1 = char_string(facc[fi]);
 	A->name2 = char_string(facc[fj]);
 
 	double_matrix_free(n1+1, n2+1, sx);
 	double_matrix_free(n1, n2, mx);
-	double d = A->sd;
 
 	/* write alignments */
 	if (p_json)
@@ -1364,6 +1360,7 @@ double pair_align(int fi, int fj)
 	if (p_baln)
 		aln_write_binary(A);
 
+	double d = A->sd;
 	aln_free(A);
 	return (d);
 }
