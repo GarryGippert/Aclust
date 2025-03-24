@@ -56,7 +56,7 @@ Output Newick trees, alignments, and distance matrix (sharing a common prefix)
 
 MANUSCRIPT IN PREPARATION
 
-1. For each pair of input sequences I and J, a distance DsubI,J is computed using a renormalized version of ScoreDist (Sohnhammer & Hollich, 2005). By default, alignments are computed using a local alignment algorithm (Smith & Waterman, 1981), affine gap penalties, and Blosum62 (Henikoff & Henikoff, 1992) amino-acid substitution scores. Input an MSA Fasta file (-m flag) and inferred pairwise alignment scores and derived distances are computed using the same method. <i>Scoredist normalization is part of the subject material in the coming paper.</i> The distance matrix is written to (shared_prefix implied) **_dmx.txt**.
+1. For each pair of input sequences I and J, a distance DsubI,J is computed using a renormalized version of ScoreDist (Sonnhammer & Hollich, 2005). By default, alignments are computed using a local alignment algorithm (Smith & Waterman, 1981), affine gap penalties, and Blosum62 (Henikoff & Henikoff, 1992) amino-acid substitution scores. Input an MSA Fasta file (-m flag) and inferred pairwise alignment scores and derived distances are computed using the same method. <i>Scoredist normalization is part of the subject material in the coming paper.</i> The distance matrix is written to (shared_prefix implied) **_dmx.txt**.
 
 2. The distance matrix is embedded into orthogonal coordinates using metric matrix distance geometry (Crippen & Havel, 1988). Each sequence is represented by a point in this space <i>(x,y,z,....) or (w0,w1,w2,...,wM-1), for dimension M usually 20</i>.
    
