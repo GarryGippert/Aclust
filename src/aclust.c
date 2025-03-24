@@ -730,7 +730,7 @@ double **pair_score_matrix(int fi, int fj)
 	return (m);
 }
 
-double align_score(int n1, int n2, double **S, double **M, int *o1, int *o2, int flag)
+double align_score(char *s1, char *s2, int n1, int n2, double **S, double **M, double fg, double ng, int *o1, int *o2, int flag)
 /* Generate optimal local alignment path using affine gap penalties
 // return alignment score, indirectly return sequence offsets, and filled-in match matrix
 // attributed to Smith & Waterman, 1981
@@ -746,11 +746,13 @@ double align_score(int n1, int n2, double **S, double **M, int *o1, int *o2, int
 	T = double_matrix(n1 + 1, n2 + 1);
 	U = double_matrix(n1 + 1, n2 + 1);
 	V = double_matrix(n1 + 1, n2 + 1);
+
+	/* initialize far edge */
 	for (j = n2 - 1; j >= 0; j--) {
 		Tij = T[n1][j + 1];
 		T[n1][j] = Tij;
 		U[n1][j] = Tij;
-		V[n1][j] = Tij - p_go;
+		V[n1][j] = Tij - fg;
 	}
 
 	/* backwards from last row */
@@ -764,7 +766,7 @@ double align_score(int n1, int n2, double **S, double **M, int *o1, int *o2, int
 		Up = U[i + 1];
 		Vp = V[i + 1];
 		Ti[n2] = Tp[n2];
-		Ui[n2] = Ti[n2] - p_go;
+		Ui[n2] = Ti[n2] - fg;
 		Vi[n2] = Ti[n2];
 
 		/* backwards from last column */
@@ -772,35 +774,33 @@ double align_score(int n1, int n2, double **S, double **M, int *o1, int *o2, int
 			Tij = Tp[j + 1] + Si[j];
 			Mi[j] = Tij;
 			/* insertion in sequence 2 */
-			t1 = Vp[j] - p_ge;
-			t2 = Tp[j] - p_go;
+			t1 = Vp[j] - ng;
+			t2 = Tp[j] - fg;
 			Vij = (t1 > t2 ? t1 : t2);
 			if (flag & ALIGN_CROSS) {
-				t3 = Up[j] - p_ge;
+				t3 = Up[j] - ng;
 				Vij = (t3 > Vij ? t3 : Vij);
 			}
-			if (Vij > Tij)
-				Tij = Vij;
+			Tij = (Vij > Tij ? Vij : Tij);
+
 			/* insertion in sequence 1 */
-			t1 = Ui[j + 1] - p_ge;
-			t2 = Ti[j + 1] - p_go;
+			t1 = Ui[j + 1] - ng;
+			t2 = Ti[j + 1] - fg;
 			Uij = (t1 > t2 ? t1 : t2);
 			if (flag & ALIGN_CROSS) {
-				t3 = Vi[j + 1] - p_ge;
+				t3 = Vi[j + 1] - ng;
 				Uij = (t3 > Uij ? t3 : Uij);
 			}
-			if (Uij > Tij)
-				Tij = Uij;
+			Tij = (Uij > Tij ? Uij : Tij);
+
 			if (Tij > ascore) {
-				if (p_v)
-					printf("backprop I %d J %d Ascore now %g, delta %g\n", i, j, Tij, Tij - ascore);
 				ascore = Tij;
-				printf("ASCORE i %d n1 %d j %d n2 %d ascore %g\n", i, n1, j, n2, ascore);
+				if (p_v > 1)
+					fprintf(stderr, "ASCORE i %d%c j %d%c ascore %g\n", i, s1[i], j, s2[j], ascore);
 				(*o1) = i;
 				(*o2) = j;
 			}
-			if (Tij < 0.0)
-				Tij = 0.0;
+			Tij = (Tij < 0.0 ? 0.0 : Tij);
 			Ti[j] = Tij;
 			Vi[j] = Vij;
 			Ui[j] = Uij;
@@ -812,131 +812,6 @@ double align_score(int n1, int n2, double **S, double **M, int *o1, int *o2, int
 	/* it is possible this ascore is larger that computed from the generated alignment strings. */
 	/* WTF  */
 	return (ascore);
-}
-
-int align_index(int n1, int n2, double **S, double **M, int o1, int o2, int **d1, int **d2, int align_flag)
-/* revisit optimal path through alignment match matrix, and deduce sequence indices
-// return total length of (optionally padded) alignment, return indirectly sequence indices */
-{
-	int k, l, nk, nl, bk, bl, tg, *t1, *t2;
-	double max, tmp;
-	int plen = 0;
-	*d1 = NULL;
-	*d2 = NULL;
-	if (o1 == -1 || o2 == -1)
-		return (plen);
-	t1 = int_vector(n1 + n2);
-	t2 = int_vector(n1 + n2);
-
-	/* pad at alignment start */
-	if (align_flag & ALIGN_PAD) {
-		for (k = 0; k < o1; k++) {
-			t1[plen] = k;
-			t2[plen] = ALIGN_PAD_NDX;
-			plen++;
-		}
-		for (l = 0; l < o2; l++) {
-			t1[plen] = ALIGN_PAD_NDX;
-			t2[plen] = l;
-			plen++;
-		}
-	}
-
-	/* first aligned position */
-	k = o1;
-	l = o2;
-
-	while (1) {
-		/* previous match state */
-		t1[plen] = k;
-		t2[plen] = l;
-		plen++;
-
-		/* next k,l */
-		nk = k + 1;
-		nl = l + 1;
-		if (nk >= n1 || nl >= n2)
-			break;
-
-		/* match state */
-		bk = nk;
-		bl = nl;
-		max = M[nk][nl];
-		if (max <= 0.0)
-			break;
-
-		/* gap in column ? */
-		for (k = nk + 1; k < n1; k++) {
-			tmp = M[k][nl] - p_go - p_ge * (k - nk - 1);
-			if (tmp > max) {
-				max = tmp;
-				bk = k;
-			}
-		}
-
-		/* gap in row ? */
-		for (l = nl + 1; l < n2; l++) {
-			tmp = M[nk][l] - p_go - p_ge * (l - nl - 1);
-			if (tmp > max) {
-				max = tmp;
-				bl = l;
-			}
-		}
-		/* gap in both row and column ? */
-		if (align_flag & ALIGN_BODY)
-			for (k = nk; k < n1; k++) {
-				for (l = nl; l < n2; l++) {
-					tg = k - nk + l - nl;
-					tmp = M[k][l] - (tg ? p_go - p_ge * (tg - 1) : 0.0);
-					if (tmp > max) {
-						max = tmp;
-						bk = k;
-						bl = l;
-					}
-				}
-			}
-
-		if (align_flag & ALIGN_GAP) {
-			/* gap in column */
-			for (k = nk; k < bk; k++) {
-				t1[plen] = k;
-				t2[plen] = ALIGN_GAP_NDX;
-				plen++;
-			}
-			/* gap in row */
-			for (l = nl; l < bl; l++) {
-				t1[plen] = ALIGN_GAP_NDX;
-				t2[plen] = l;
-				plen++;
-			}
-		}
-		/* last position */
-		k = bk;
-		l = bl;
-	}
-
-	/* optional pad C-terminal with non-aligned regions */
-	if (align_flag & ALIGN_PAD) {
-		for (k = nk; k < n1; k++) {
-			t1[plen] = k;
-			t2[plen] = ALIGN_PAD_NDX;
-			plen++;
-		}
-		for (l = nl; l < n2; l++) {
-			t1[plen] = ALIGN_PAD_NDX;
-			t2[plen] = l;
-			plen++;
-		}
-	}
-
-	/* indirect return condensed list of alignment indices */
-	*d1 = int_vector(plen);
-	*d2 = int_vector(plen);
-	memcpy((*d1), t1, (plen) * sizeof(int));
-	memcpy((*d2), t2, (plen) * sizeof(int));
-	int_vector_free(n1 + n2, t1);
-	int_vector_free(n1 + n2, t2);
-	return (plen);
 }
 
 /* ALN structure */
@@ -1167,7 +1042,7 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 			nlen++;
 
 		while ((k != len1 - 1) && (l != len2 - 1) && max > 0) {
-			/* Find best scores */
+			/* Find subsequent match */
 			nk = k + 1;
 			nl = l + 1;
 			max = M[nk][nl];
@@ -1299,145 +1174,25 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 		a->gapcost = gscore, a->ascore = mscore - gscore, a->mscore = mscore, a->aprime = natscore(ascore), a->mprime = natscore(mscore), a->ab = bitscore(ascore), a->mb = bitscore(mscore), a->zscore = zs, a->pscore = ps;
 
 		/* compute score distances */
-		// normalized to shortest
+
+		// normalized to shortest sequence length
 		int minlen = (len1 < len2 ? len1 : len2);
 		double scale =  (double)minlen/(double)mlen;
 		a->sd = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
+
 		// normalized to sequence1 length
 		scale = (double)len1/(double)mlen;
 		a->sd1 = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
+
 		// normalize to sequence2 length
 		scale = (double)len2/(double)mlen;
 		a->sd2 = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
+
 		// normalize to alignment length (original Sohnhammer Scoredist)
 		scale = (double)alen/(double)mlen;
 		a->sd0 = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
 	}
 	return(a);
-}
-
-void align_strings(char *name1, int n1, char *name2, int n2, double **S, double **M, int o1, int o2, char *s1, char *s2, char **a1, char **a2, int align_flag)
-/* produce padded alignment strings *a1 and *a2 */
-{
-	int k, l, nk, nl, bk, bl, i, plen = 0;
-	double max, tmp;
-	char *t1, *t2;
-	if (p_v)
-		printf("Alignment strings between %s (%d) and %s (%d)\n", name1, n1, name2, n2);
-	(*a1) = NULL;
-	(*a2) = NULL;
-	if (o1 == -1 || o2 == -1)
-		return;
-
-	/* tmp space for accumulating alignment strings */
-	t1 = char_vector(n1 + n2 + 2);
-	t2 = char_vector(n1 + n2 + 2);
-
-	/* optional pad N-terminal with non-aligned regions */
-	if (align_flag & ALIGN_PAD) {
-		for (k = 0; k < o1; k++) {
-			t1[plen] = s1[k];
-			t2[plen] = ALIGN_PAD_CHAR;
-			plen++;
-		}
-		for (l = 0; l < o2; l++) {
-			t1[plen] = ALIGN_PAD_CHAR;
-			t2[plen] = s2[l];
-			plen++;
-		}
-	}
-
-	/* first match */
-	k = o1;
-	l = o2;
-
-	while (1) {
-		/* align state, plen is 'padded' aka full length alignment strings */
-		t1[plen] = s1[k];
-		t2[plen] = s2[l];
-		double scoreelement = scorematrix_element(t1[plen], t2[plen]);
-		if (p_v)
-			printf("aln plen %d K %3d%c  vs L  %3d%c,  score %g\n",
-			       plen, k, s1[k], l, s2[l], scoreelement);
-		plen++;
-
-		/* next k,l */
-		nk = k + 1;
-		nl = l + 1;
-		if (nk >= n1 || nl >= n2)
-			break;
-
-		/* match state */
-		bk = nk;
-		bl = nl;
-		max = M[nk][nl];
-		if (max <= 0.0)
-			break;
-
-		/* gap in column ? */
-		for (i = nk + 1; i < n1; i++) {
-			tmp = M[i][nl] - p_go - p_ge * (i - nk - 1);
-			if (tmp > max) {
-				max = tmp;
-				bk = i;
-			}
-		}
-
-		/* gap in row ? */
-		for (i = nl + 1; i < n2; i++) {
-			tmp = M[nk][i] - p_go - p_ge * (i - nl - 1);
-			if (tmp > max) {
-				max = tmp;
-				bl = i;
-			}
-		}
-
-		if (align_flag & ALIGN_GAP) {
-			/* insert column gaps in strings */
-			for (i = nk; i < bk; i++) {
-				t1[plen] = s1[i];
-				t2[plen] = ALIGN_GAP_CHAR;
-				plen++;
-			}
-
-			/* insert row gaps in strings */
-			for (i = nl; i < bl; i++) {
-				t1[plen] = ALIGN_GAP_CHAR;
-				t2[plen] = s2[i];
-				plen++;
-			}
-		}
-
-		/* last best position */
-		k = bk;
-		l = bl;
-	}
-
-	/* optional pad C-terminal with non-aligned regions */
-	if (align_flag & ALIGN_PAD) {
-		for (i = nk; i < n1; i++) {
-			t1[plen] = s1[i];
-			t2[plen] = ALIGN_PAD_CHAR;
-			plen++;
-		}
-		for (i = nl; i < n2; i++) {
-			t1[plen] = ALIGN_PAD_CHAR;
-			t2[plen] = s2[i];
-			plen++;
-		}
-	}
-
-	/* politely terminate strings */
-	t1[plen] = 0;
-	t2[plen] = 0;
-
-	/* return first alignment in string of length plen */
-	(*a1) = char_string(t1);
-	free(t1);
-
-	/* return second alignment in string of length plen */
-	(*a2) = char_string(t2);
-	free(t2);
 }
 
 int p_strict = 0;		/* set to 1, and no deviation is allowed in the recomputation of alignment score */
@@ -1608,18 +1363,15 @@ double pair_align(int fi, int fj)
 	/* going into the alignment: */
 	int align_flag = ALIGN_GAP | ALIGN_PAD | ALIGN_CROSS;
 	char *s1 = fseq[fi], *s2 = fseq[fj], *a1 = NULL, *a2 = NULL;
-	int o1, o2, n1 = strlen(s1), n2 = strlen(s2), *d1 = NULL, *d2 = NULL;
+	int o1, o2, n1 = strlen(s1), n2 = strlen(s2);
 
 	double **sx = pair_score_matrix(fi, fj);	/* score matrix */
 	double **mx = double_matrix(n1, n2);		/* match matrix */
 
 	/* compute optimal alignment and alignment score */
-	double ascore = align_score(n1, n2, sx, mx, &o1, &o2, align_flag);
+	double ascore = align_score(s1, s2, n1, n2, sx, mx, p_go, p_ge, &o1, &o2, align_flag);
 	printf("ASCORE %g n1 %d n2 %d o1 %d o2 %d acc1 %s acc2 %s\n",
 		ascore, n1, n2, o1, o2, facc[fi], facc[fj]);
-
-	/* revisit alignment and compute total padded alignment length */
-	int plen = align_index(n1, n2, sx, mx, o1, o2, &d1, &d2, align_flag);
 
 	ALN *A = align_ali(s1, s2, n1, n2, o1, o2, sx, mx, align_flag);
 	A->name1 = char_string(facc[fi]);
