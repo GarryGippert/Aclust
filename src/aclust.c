@@ -820,7 +820,7 @@ typedef struct aln {
 	char *name1, *name2, *seq1, *seq2, *aln1, *aln2;	/* accession, sequence string and alignment string of each pair */
 	int len1, len2, start1, start2, end1, end2;		/* sequence lengths and start/end coordinates (1-based) */
 	int plen, alen, mlen, ilen, glen, olen, clen, nlen;	/* counts related to alignment */
-	double gapcost, ascore, mscore, aprime, mprime, ab, mb, mscore1, mscore2, mscorer, mscorea, sd0, sd1, sd2, sd;	/* properties of the alignment */
+	double gapcost, ascore, mscore, aprime, mprime, ab, mb, mscore1, mscore2, mscorer, sd0, sd1, sd2, sd;	/* properties of the alignment */
 	double zscore, pscore;					/* related to CE alignments */
 	double score, evalue, bitscore;				/* related to BLAST alignemnts */
 } ALN;
