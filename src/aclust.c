@@ -730,7 +730,7 @@ double **pair_score_matrix(int fi, int fj)
 	return (m);
 }
 
-double align_score(char *s1, char *s2, int n1, int n2, double **S, double **M, double fg, double ng, int *o1, int *o2, int flag)
+double align_score(char *s1, char *s2, int n1, int n2, double **S, double **M, double fg, double ng, int *o1, int *o2, int align_flag)
 /* Generate optimal local alignment path using affine gap penalties
 // return alignment score, indirectly return sequence offsets, and filled-in match matrix
 // attributed to Smith & Waterman, 1981
@@ -777,7 +777,7 @@ double align_score(char *s1, char *s2, int n1, int n2, double **S, double **M, d
 			t1 = Vp[j] - ng;
 			t2 = Tp[j] - fg;
 			Vij = (t1 > t2 ? t1 : t2);
-			if (flag & ALIGN_CROSS) {
+			if (align_flag & ALIGN_CROSS) {
 				t3 = Up[j] - ng;
 				Vij = (t3 > Vij ? t3 : Vij);
 			}
@@ -787,7 +787,7 @@ double align_score(char *s1, char *s2, int n1, int n2, double **S, double **M, d
 			t1 = Ui[j + 1] - ng;
 			t2 = Ti[j + 1] - fg;
 			Uij = (t1 > t2 ? t1 : t2);
-			if (flag & ALIGN_CROSS) {
+			if (align_flag & ALIGN_CROSS) {
 				t3 = Vi[j + 1] - ng;
 				Uij = (t3 > Uij ? t3 : Uij);
 			}
@@ -992,30 +992,21 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 		plen = alen = mlen = ilen = glen = olen = clen = nlen = 0;
 		ascore = gscore = mscore = mscore1 = mscore2 = mscorer = ps = 0.0;
 		zs = -99.9;
-#ifdef SCOVEC
-		scovec = double_vector(0, len1 + len2);
-#endif
 		t1     = char_vector(len1 + len2 + 2);
 		t2     = char_vector(len1 + len2 + 2);
-#define PADENDS
-#ifdef PADENDS
-		for (i = 0; i < o1; i++) {
-			t1[plen] = seq1[i];
-			t2[plen] = ALIGN_PAD_CHAR;
-#ifdef SCOVEC
-			scovec[plen] = -2.0;
-#endif
-			plen++;
+
+		if (ALIGN_PAD) {
+			for (i = 0; i < o1; i++) {
+				t1[plen] = seq1[i];
+				t2[plen] = ALIGN_PAD_CHAR;
+				plen++;
+			}
+			for (j = 0; j < o2; j++) {
+				t1[plen] = ALIGN_PAD_CHAR;
+				t2[plen] = seq2[j];
+				plen++;
+			}
 		}
-		for (j = 0; j < o2; j++) {
-			t1[plen] = ALIGN_PAD_CHAR;
-			t2[plen] = seq2[j];
-#ifdef SCOVEC
-			scovec[plen] = -2.0;
-#endif
-			plen++;
-		}
-#endif
 
 		/* inject first aligned position into score, counts and alignment strings */
 		k = o1;
@@ -1026,9 +1017,6 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 		mscorer -= 1.0;
 		t1[plen] = seq1[k];
 		t2[plen] = seq2[l];
-#ifdef SCOVEC
-		scovec[plen] = S[k][l];
-#endif
 		max = M[k][l];
 		plen++;
 		alen++;
@@ -1064,20 +1052,20 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 					nl = j;
 				}
 			}
-#define CROSSOVERGAP
-#ifdef CROSSOVERGAP
 			/* cross-over gap in both column and row ? */
-			for (i = k + 1; i < len1; i++)
-			for (j = l + 1; j < len2; j++) {
-				int g = i - (k + 1) + j - (l + 1);
-				tmp = M[i][j] - (g ? p_go + p_ge * (g - 1) : 0.0);
-				if (tmp > max) {
-					max = tmp;
-					nk = i;
-					nl = j;
+			if (align_flag & ALIGN_CROSS) {
+				for (i = k + 1; i < len1; i++)
+				for (j = l + 1; j < len2; j++) {
+					int g = i - (k + 1) + j - (l + 1);
+					tmp = M[i][j] - (g ? p_go + p_ge * (g - 1) : 0.0);
+					if (tmp > max) {
+						max = tmp;
+						nk = i;
+						nl = j;
+					}
 				}
 			}
-#endif
+
 			if (max > 0) {
 				/* Insert gaps */
 				for (i = k + 1; i < nk; i++) {
@@ -1107,9 +1095,6 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 				mscorer -= 1.0;
 				t1[plen] = seq1[k];
 				t2[plen] = seq2[l];
-#ifdef SCOVEC
-				scovec[plen] = S[k][l];
-#endif
 				max = M[k][l];
 				plen++;
 				alen++;
@@ -1124,32 +1109,22 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 
 			}
 		}
-#ifdef PADENDS
-		for (i = nk; i < o1; i++) {
-			t1[plen] = seq1[i];
-			t2[plen] = ALIGN_PAD_CHAR;
-#ifdef SCOVEC
-			scovec[plen] = -2.0;
-#endif
-			plen++;
+		if (align_flag & ALIGN_PAD) {
+			for (i = nk; i < len1; i++) {
+				t1[plen] = seq1[i];
+				t2[plen] = ALIGN_PAD_CHAR;
+				plen++;
+			}
+			for (j = nl; j < len2; j++) {
+				t1[plen] = ALIGN_PAD_CHAR;
+				t2[plen] = seq2[j];
+				plen++;
+			}
 		}
-		for (j = nl; i < o2; j++) {
-			t1[plen] = ALIGN_PAD_CHAR;
-			t2[plen] = seq2[j];
-#ifdef SCOVEC
-			scovec[plen] = -2.0;
-#endif
-			plen++;
-		}
-#endif
+
 		/* terminate alignment strings */
 		t1[plen] = 0;
 		t2[plen] = 0;
-#ifdef SCOVEC
-		double_vector_free(len1 + len2, scovec);
-#endif
-
-		fprintf(stderr, "MSCORE %g MSCORE1 %g MSCORE2 %g MSCORER %g\n", mscore, mscore1, mscore2, mscorer);
 
 		if (mlen > 0) {
 			zs = blosum_zscore(mscore, mlen);
@@ -1171,7 +1146,7 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 		a->aln1 = char_string(t1), free(t1);
 		a->aln2 = char_string(t2), free(t2);
 		a->plen = plen, a->alen = alen, a->mlen = mlen, a->glen = glen, a->ilen = ilen, a->olen = olen, a->clen = clen, a->nlen = nlen;
-		a->gapcost = gscore, a->ascore = mscore - gscore, a->mscore = mscore, a->aprime = natscore(ascore), a->mprime = natscore(mscore), a->ab = bitscore(ascore), a->mb = bitscore(mscore), a->zscore = zs, a->pscore = ps;
+		a->gapcost = gscore, a->ascore = mscore - gscore, a->mscore = mscore, a->mscore1 = mscore1, a->mscore2 = mscore2, a->mscorer = mscorer, a->aprime = natscore(ascore), a->mprime = natscore(mscore), a->ab = bitscore(ascore), a->mb = bitscore(mscore), a->zscore = zs, a->pscore = ps;
 
 		/* compute score distances */
 
