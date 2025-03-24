@@ -12,7 +12,7 @@ Distance-matrix approach.
 NNJ in distance space, and embedded coordinate space.
 
 1. For each pair of input sequences, a distance is computed using a modified version of ScoreDist
-(Sohnhammer & Hollich, 2005). Input sequences may represent a multiple alignment, OR, if the input
+(Sonnhammer & Hollich, 2005). Input sequences may represent a multiple alignment, OR, if the input
 sequences are unaligned, pairwise protein sequence alignments are computed using a local alignment
 algorithm (Smith & Waterman, 1981) with affine gap penalties. The Blosum62 amino-acid substitution
 score matrix is used to determine alignment match scores.
@@ -963,7 +963,7 @@ void aln_write_binary(ALN *A)
 
 #define MAXSCOREDIST 9999.9
 double compute_scoredistance(double ma, double mr, double m1, double m2, double scale)
-/* unpublished Gippert, G.P, ca 2009, sequence-length normalization of ScoreDist from Sohnhammer & Hollich 2005 */
+/* unpublished Gippert, G.P, ca 2009, sequence-length normalization of ScoreDist from Sonnhammer & Hollich 2005 */
 {
 	double num = ma - (mr * scale);
 	double den = ((m1 + m2) / 2.0 - mr) * scale;
@@ -1285,7 +1285,7 @@ void align_stats(ALN *A, int expected_plen, double expected_ascore)
 	A->ascore = A->mscore - A->gapcost;
 
 	/* compute score distances */
-	/* original score distance of Sonhammer & Hollich normalized to alignment length */
+	/* original score distance of Sonnhammer & Hollich normalized to alignment length */
 	double scale = (double)(A->alen) / (double)(A->mlen);
 	A->sd0 = compute_scoredistance(A->mscore, A->mscorer, A->mscore1, A->mscore2, scale);
 
@@ -2583,7 +2583,7 @@ Output files share a prefix <p>, which is default name of first fasta input file
 \n\
 DETAILS: Score distance matrix based on pairwise local sequence\n\
 alignments (Smith & Waterman) OR multiple alignment given in input\n\
-Fasta records. Scoredist values (SohnHammer & Hollich) are normalized\n\
+Fasta records. Scoredist values (Sonnhammer & Hollich) are normalized\n\
 to the shorter sequence length.  Tree computed from distance matrix\n\
 by embedding into orthogonal coordinates (metric matrix distance\n\
 geometry) and nearest-neighbor joining. Tree refined by re-embedding\n\
