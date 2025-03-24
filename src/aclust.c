@@ -2644,7 +2644,7 @@ int pparse(int argc, char *argv[])
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
 			if (sscanf(argv[c], "%c", &p_e) == 1)
-				fprintf(stderr, "Embed set to %d\n", p_e);
+				fprintf(stderr, "Embed set to %c\n", p_e);
 			else
 				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
 			c++;
