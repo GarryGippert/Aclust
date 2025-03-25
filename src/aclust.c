@@ -159,6 +159,7 @@ ACLUST was developed and written by Garry Paul Gippert, and packaged as a single
 int p_v = 0;			/* verbose flag, set to 1 for additional diagnostic output */
 double p_go = 12.0;		/* gap open = first gap penalty */
 double p_ge = 1.0;		/* gap extend = next gap penalty */
+int p_gx = 100;			/* maximum gap crossover length (set to 0 to deactivate) */
 int p_json = 1;			/* output alignments in pseudo-json format */
 int p_taln = 1;			/* output alignment as text */
 int p_baln = 1;			/* output alignment as binary */
@@ -712,40 +713,69 @@ void read_fasta(char *filename)
 
 /* ALIGNMENT */
 
-double **pair_score_matrix(int fi, int fj)
+/* use some global variables to save time allocating/deallocating memory */
+double **global_score_matrix = NULL, **global_match_matrix = NULL;
+int global_seqlen = 0;
+
+void pair_score_matrix(int f1, int f2)
 /* provide Blosum62 substitution score matrix for pair of fasta elements fi, fj */
 {
-	char *si = fseq[fi], *sj = fseq[fj];
-	int i, j, ni = strlen(si), nj = strlen(sj);
-	double **m = double_matrix(ni+1, nj+1);
+	char *s1 = fseq[f1], *s2 = fseq[f2];
+	int i, j, n1 = strlen(s1), n2 = strlen(s2);
+	if (n1 > global_seqlen || n2 > global_seqlen){
+		if (global_score_matrix) {
+			double_matrix_free(global_seqlen + 1, global_seqlen + 1, global_score_matrix);
+			double_matrix_free(global_seqlen, global_seqlen, global_match_matrix);
+		}
+		global_seqlen = (n1 > n2 ? n1 : n2);
+		global_score_matrix = double_matrix(global_seqlen + 1, global_seqlen + 1);
+		global_match_matrix = double_matrix(global_seqlen, global_seqlen);
+	}
 	/* body of score matrix contains sequence I vs sequence J substitutions */
-	for (i = 0; i < ni; i++)
-		for (j = 0; j < nj; j++)
-			m[i][j] = scorematrix_element(si[i], sj[j]);
+	for (i = 0; i < n1; i++)
+		for (j = 0; j < n2; j++)
+			global_score_matrix[i][j] = scorematrix_element(s1[i], s2[j]);
 	/* edges of score matrix contain sequence I and sequence J self-scores */
-	for (i = 0; i < ni; i++)
-		m[i][nj] = scorematrix_element(si[i], si[i]);
-	for (j = 0; j < nj; j++)
-		m[ni][j] = scorematrix_element(sj[j], sj[j]);
-	return (m);
+	for (i = 0; i < n1; i++)
+		global_score_matrix[i][n2] = scorematrix_element(s1[i], s1[i]);
+	for (j = 0; j < n2; j++)
+		global_score_matrix[n1][j] = scorematrix_element(s2[j], s2[j]);
 }
 
+double **global_T = NULL, **global_U = NULL, **global_V = NULL;
+int global_N = 0;
+
 double align_score(char *s1, char *s2, int n1, int n2, double **S, double **M, double fg, double ng, int *o1, int *o2, int align_flag)
-/* Generate optimal local alignment path using affine gap penalties
-// return alignment score, indirectly return sequence offsets, and filled-in match matrix
-// attributed to Smith & Waterman, 1981
-// Note: Pointers provide an optimization/obfuscation trade-off. */
+/* Generate optimal local (Smit & Waterman 1981) alignment path using affine gap penalties
+ * including an unpublished crossover gap allowance (Gippert 2001). Return alignment score
+ * and (indirectly) sequence offsets. */
 {
 	int i, j;
-	double **T, **U, **V, *Ti, *Tp, *Si, *Vi, *Vp, *Ui, *Mi, *Up, t1, t2, t3, Tij, Uij, Vij;
 	double ascore = 0.0;
 	*o1 = -1;
 	*o2 = -1;
 
-	/* Initialize transition matrices */
-	T = double_matrix(n1 + 1, n2 + 1);
-	U = double_matrix(n1 + 1, n2 + 1);
-	V = double_matrix(n1 + 1, n2 + 1);
+	if (n1 > global_N || n2 > global_N) {
+		if (global_T) {
+			double_matrix_free(global_N + 1, global_N + 1, global_T);
+			double_matrix_free(global_N + 1, global_N + 1, global_U);
+			double_matrix_free(global_N + 1, global_N + 1, global_V);
+		}
+		global_N = (n1 > n2 ? n1 : n2);
+		global_T = double_matrix(global_N + 1, global_N + 1);
+		global_U = double_matrix(global_N + 1, global_N + 1);
+		global_V = double_matrix(global_N + 1, global_N + 1);
+	} else {
+		for(i = 0; i <= global_N; i++)
+			for (j = 0; j <= global_N; j++)
+				global_T[i][j] = global_U[i][j] = global_V[i][j] = 0.0;
+	}
+
+	/* initialize transition matrices */
+	double **T = global_T, **U = global_U, **V = global_V;
+
+	/* additional tmp variables and row pointers */
+	double *Ti, *Tp, *Si, *Vi, *Vp, *Ui, *Mi, *Up, t1, t2, t3, Tij, Uij, Vij;
 
 	/* initialize far edge */
 	for (j = n2 - 1; j >= 0; j--) {
@@ -773,6 +803,7 @@ double align_score(char *s1, char *s2, int n1, int n2, double **S, double **M, d
 		for (j = n2 - 1; j >= 0; j--) {
 			Tij = Tp[j + 1] + Si[j];
 			Mi[j] = Tij;
+
 			/* insertion in sequence 2 */
 			t1 = Vp[j] - ng;
 			t2 = Tp[j] - fg;
@@ -806,11 +837,6 @@ double align_score(char *s1, char *s2, int n1, int n2, double **S, double **M, d
 			Ui[j] = Uij;
 		}
 	}
-	double_matrix_free(n1 + 1, n2 + 1, T);
-	double_matrix_free(n1 + 1, n2 + 1, U);
-	double_matrix_free(n1 + 1, n2 + 1, V);
-	/* it is possible this ascore is larger that computed from the generated alignment strings. */
-	/* WTF  */
 	return (ascore);
 }
 
@@ -995,7 +1021,7 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 		t1     = char_vector(len1 + len2 + 2);
 		t2     = char_vector(len1 + len2 + 2);
 
-		if (ALIGN_PAD) {
+		if (align_flag & ALIGN_PAD) {
 			for (i = 0; i < o1; i++) {
 				t1[plen] = seq1[i];
 				t2[plen] = ALIGN_PAD_CHAR;
@@ -1053,6 +1079,9 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 				}
 			}
 			/* cross-over gap in both column and row ? */
+#ifdef RAW_CODE
+			/* this version is the most 'correct', although the crossover gap is not
+			 * described in any other source code for SW local alignment, afaik. */
 			if (align_flag & ALIGN_CROSS) {
 				for (i = k + 1; i < len1; i++)
 				for (j = l + 1; j < len2; j++) {
@@ -1065,7 +1094,25 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 					}
 				}
 			}
-
+#else
+			/* this version limits the search scope for a suitable crossover match to p_gx */
+			if (p_gx && align_flag & ALIGN_CROSS) {
+				int g, h, x = len1 - (k + 1) + len2 - (l + 1);
+				x = (x > p_gx ? p_gx : x);
+				for (g = 0; g < x; g++)
+				for (h = 0; h <= g; h++) {
+					i = k + 1 + h, j = l + 1 + g - h;
+					if (i < len1 && j < len2) {
+						tmp = M[i][j] - (g ? p_go + p_ge * (g - 1) : 0.0);
+						if (tmp > max) {
+							max = tmp;
+							nk = i;
+							nl = j;
+						}
+					}
+				}
+			}
+#endif
 			if (max > 0) {
 				/* Insert gaps */
 				for (i = k + 1; i < nk; i++) {
@@ -1081,7 +1128,7 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 					alen++;
 				}
 				/* and update gap/open count and total gapscore (penalty) */
-				int g = (nk - k - 1) + (nl - l - 1);
+				int g = nk - (k + 1) + nl - (l + 1);
 				glen += g;
 				olen += (g > 0 ? 1 : 0);
 				gscore += (g > 0 ? p_go + (g - 1) * p_ge : 0.0);
@@ -1340,17 +1387,14 @@ double pair_align(int fi, int fj)
 	char *s1 = fseq[fi], *s2 = fseq[fj], *a1 = NULL, *a2 = NULL;
 	int o1, o2, n1 = strlen(s1), n2 = strlen(s2);
 
-	double **sx = pair_score_matrix(fi, fj);	/* score matrix */
-	double **mx = double_matrix(n1, n2);		/* match matrix */
+	pair_score_matrix(fi, fj);	/* allocate global score and match matrix */
+	double **sx = global_score_matrix, **mx = global_match_matrix;
 
 	/* compute optimal alignment and alignment score */
 	double ascore = align_score(s1, s2, n1, n2, sx, mx, p_go, p_ge, &o1, &o2, align_flag);
 	ALN *A = align_ali(s1, s2, n1, n2, o1, o2, sx, mx, align_flag);
 	A->name1 = char_string(facc[fi]);
 	A->name2 = char_string(facc[fj]);
-
-	double_matrix_free(n1+1, n2+1, sx);
-	double_matrix_free(n1, n2, mx);
 
 	/* write alignments */
 	if (p_json)
@@ -2635,6 +2679,15 @@ int pparse(int argc, char *argv[])
 				parameter_value_missing(c, argc, argv);
 			if (sscanf(argv[c], "%lf", &p_ge) == 1)
 				fprintf(stderr, "Gap extension set to %g\n", p_ge);
+			else
+				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
+			c++;
+		}
+		else if (strncmp(argv[c], "-gx", 3) == 0) {
+			if (++c == argc)
+				parameter_value_missing(c, argc, argv);
+			if (sscanf(argv[c], "%d", &p_gx) == 1)
+				fprintf(stderr, "Gap max crossover length set to %d\n", p_gx);
 			else
 				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
 			c++;
