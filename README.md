@@ -27,32 +27,62 @@ Help with command line parameters: <pre>bin/aclust -h</pre>
 <pre>
 aclust [parameters_and_flags] my.fasta [another.fasta ...] 
 
-Required parameters:
-	-s 'path'		file location of substitution score matrix (could be 'dat/BLOSUM62.txt')
-Optional parameters:
-	-p 'string'		prefix for all output files (default=name of first input fasta file)
-	-d integer		embed dimension (default 20)
-Optional flags:
-	-m 			activates to interpret input Fasta as MSA
-Less important flags:
+Control aligment:
+	-s <string>		location of file containing BLOSUM62 substitution score matrix
+				default '../dat/BLOSUM62.dat'
+
+	-go <double>		gap open penalty
+				default 12.0
+
+	-ge <double>		gap extend penalty
+				default 1.0
+
+	-gx <integer>		gap maximum crossover length
+				default 100, set to 0 to deactivate crossover allowance
+
+	-m			flag MSA = infer pairwise alignments from input MSA rather than SW alignment
+				default off
+
+	-nonself		deactivates self alignments  (obscure usecase)
+
+Control tree generation:
+	-e <char>		choose D for only distance tree, S for additional first embed tree, F for additional full recursive embed tree
+				default 'F'
+
+	-d <integer>		embed dimension = number of orthogonal coordinates to derive from distance matrix before NNJ
+				default 20
+
+Control output:
+	-p <string>		prefix for output files
+				default = name of first fasta input file
+
 	-j			deactivates writing of JSON alignment file
-	-nonself		deactivates self alignments
-	-v			activates more verbose output
+				default on
+
+	-v			activates more verbose output (usually on stderr)
+				default off, can be invoked more than once
 </pre>
 
-#### Input and output files
-Input Fasta
-- Sequences may be pre-aligned (MSA). Otherwise local (SW) alignments are computed.
+#### Input files
+Protein sequences are read from one or more Fasta files.
+If the -m flag is given, input is assumed to be already in a multiple alignment.
 
-Output Newick trees, alignments, and distance matrix (sharing a common prefix)
-- _aln.txt- Alignments (text)
-- _aln.js - Alignments (JSON-parsable text)
-- _dmx.txt - Distance Matrix (text)
-- **_dree.txt** - Distance Matrix tree (newick)
-- **_tree0.txt** - Initial Embed tree (newick)
-- **_tree.txt** - Refined Embed tree (newick)
+#### Output files
+All output files share a common prefix (-p option).
 
-### Bit longer introduction
+<pfx>.aln.txt	Computed or derived pairwise alignments in non-standard TXT format.
+
+<pfx>.aln.js	Computed or derived pairwise alignments in JSON format. Individual lines should be parsed separately.
+
+<pfx>.dmx.txt	Distance matrix file in simple 3-column format. Can in principle be used to derive SSN.
+
+<pfx>.dree.txt	Newick format tree from NNJ on distance matrix
+
+<pfx>.tree0.txt	Newick format tree from NNJ on initial embedding of distances into orthogonal coordinate space.
+
+<pfx>.tree.txt	Newick format tree from recursive reembedding/NNJ starting from initial tree.
+
+### More details
 
 MANUSCRIPT IN PREPARATION
 
@@ -82,42 +112,37 @@ Key drawbacks:
 Garry Paul Gippert, Bioengineering, Danish Technical University, Lyngby, Sealand, Denmark. Please contact me with suggestions or questions. Aclust was developed for and with a bunch of the world's great colleagues, starting way back in 2007.
 
 ### Provenance and Licensing
-Key software and conceptual elements used in Aclust were developed by Garry Paul Gippert while employed at Novozymes A/S, Denmark. The software was kindly relicensed by Novozymes A/S back to Garry Paul Gippert, in Jan 2022, with the licencing text given below. The current Aclust repository contains a cherry-picked and shrink-wrapped selection from that material, therefore the same licensing conditions are likely to apply here.
-<pre>**LICENSE.txt** 
-Copyright 2022 Novozymes A/S
+Aclust was conceived by Garry P. Gippert while employed at Novozymes
+A/S. A derived source code has been made available here under GNU
+General Public License v3.0. Date of this GitHub repository Nov 2023.
 
-This license covers all content within the provide data 
-package, that originates from Novozymes A/S and delivered as 
-'Garry-Paul-Gippert_data-extract_1.tar.gz' on 31.01.2022. 
-Other content within the package that e.g. is obtained from 
-external sources, collaborators or public sources is not 
-covered but should respect all license restrictions that may 
-be associated. 
+Additionally where applicable:
 
-Permission is hereby granted, free of charge, to any person 
-obtaining a copy of this software and associated documentation 
-files (the "Software") to utilize, copy, modify, merge, 
-distribute and to permit persons to whom the Software is 
-furnished to do so, subject to the following conditions:
+This license covers all content within the provided data package.
+Other content within the package that e.g. is obtained from external
+sources, collaborators or public sources is not covered but should
+respect all license restrictions that may be associated.
 
-THE CONTENT CANNOT BE INTEGRATED OR SOLD FOR COMMERCIAL USE IN 
-ANY FORM. ALL MATERIAL WITHIN THIS DATA PACKAGE ORIGINATING 
-FROM NOVOZYMES A/S IS FOR NON-COMMCERIAL USE ONLY.
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software") to utilize, copy, modify, merge, distribute and to
+permit persons to whom the Software is furnished to do so, subject
+to the following conditions:
 
-The above copyright notice and this permission notice shall be 
+THE CONTENT CANNOT BE INTEGRATED OR SOLD FOR COMMERCIAL USE IN ANY
+FORM. ALL MATERIAL WITHIN THIS DATA PACKAGE IS FOR NON-COMMCERIAL
+USE ONLY.
+
+The above copyright notice and this permission notice shall be
 included in all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES 
-OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT 
-HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
-DEALINGS IN THE SOFTWARE.
-</pre>
-
-The spelling mistake is not mine. To the extent it does not conflict with the above conditions Aclust is made available here under GNU General Public License v3.0. Date of this GitHub repository Nov 2023.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR
+ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ### References
 
