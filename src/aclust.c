@@ -1405,6 +1405,7 @@ ALN *pair_align(int fi, int fj)
 }
 
 double **global_dmx = NULL;
+double **global_imx = NULL;
 
 double **align_fasta()
 /* return all-vs-all pairwise distance matrix from multiple alignment or computed pairwise alignments
@@ -1412,7 +1413,8 @@ double **align_fasta()
 // to the shortest sequence length of the pair */
 {
 	int i, inext, j;
-	global_dmx = double_matrix(g_nent, g_nent);
+	global_dmx = double_matrix(g_nent, g_nent);	/* distance matrix */
+	global_imx = double_matrix(g_nent, g_nent);	/* identity matrix */
 	ALN *A;
 	for (i = 0; i < g_nent; i++) {
 		for (j = (p_nonself ? i + 1 : i); j < g_nent; j++) {
@@ -1428,6 +1430,7 @@ double **align_fasta()
 
 			/* populate distance matrix with minlen score distance */
 			global_dmx[i][j] = global_dmx[j][i] = A->sd;
+			global_imx[i][j] = global_imx[j][i] = 100.0 * (double)(A->ilen)/(double)(A->mlen);
 
 			aln_free(A);
 		}
@@ -1853,7 +1856,24 @@ void bnode_indexi(BNODE * B, int *index, int *i)
 		fprintf(stderr, "bnode_indexi: B->left xor B->right in bnode_indexi\n"), exit(1);
 }
 
-double **global_dmx;
+void averms(double **mx, int n, int *index, int m, int *jndex, double *ave, double *rms)
+/* return average and rmsd of specific indices on left (n, index) and right (m, jndex) nodes */
+{
+	*ave = *rms = 0.0;
+	double sum = 0.0, cnt = 0.0, sqr = 0.0, v;
+	int i, j;
+	for (i = 0; i < n; i++)
+		for (j = 0; j < m; j++) {
+			v = mx[index[i]][jndex[j]];
+			sum += v;
+			cnt += 1.0;
+			sqr += v*v;
+		}
+	if (cnt > 0.0){
+		*ave = sum/cnt;
+		*rms = sqrt(fabs(sqr/cnt - (*ave)*(*ave)));
+	}
+}
 
 void bnode_print_metadata(FILE *fp, BNODE *left, BNODE *right)
 /* print metadata comparing left and right branches */
@@ -1867,21 +1887,10 @@ void bnode_print_metadata(FILE *fp, BNODE *left, BNODE *right)
 	int *jndex = int_vector(m), j = 0;
 	bnode_indexi(right, jndex, &j);
 
-	double sum = 0.0, cnt = 0.0, sqr = 0.0, dis;
-	for (i = 0; i < n; i++)
-		for (j = 0; j < m; j++) {
-			dis = global_dmx[index[i]][jndex[j]];
-			//printf("i %d j %d dis %g\n", i, j, dis);
-			sum += dis;
-			cnt += 1.0;
-			sqr += dis*dis;
-		}
-	double ave = 0.0, rms = 0.0;
-	if (cnt > 0.0){
-		ave = sum/cnt;
-		rms = sqrt(fabs(sqr/cnt - ave*ave));
-	}
-	fprintf(fp, "[&dave=%.1f,drms=%.1f]", ave, rms);
+	double dave, drms;
+	averms(global_dmx, n, index, m, jndex, &dave, &drms);
+
+	fprintf(fp, "[&dave=%.1f,drms=%.1f]", dave, drms);
 	free((char *)index);
 	free((char *)jndex);
 }
