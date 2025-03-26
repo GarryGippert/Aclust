@@ -1045,7 +1045,7 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 		plen++;
 		alen++;
 		mlen++;
-		/* count identical, conserved, and non-negative matches) */
+		/* count identical, conserved, and non-negative matches */
 		if (seq1[k] == seq2[l])
 			ilen++;
 		if (S[k][l] > 0.0)
@@ -1144,23 +1144,23 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 				plen++;
 				alen++;
 				mlen++;
-				/* count identical, conserved, and non-negative matches) */
+				/* count identical, conserved, and non-negative matches */
 				if (seq1[k] == seq2[l])
 					ilen++;
 				if (S[k][l] > 0.0)
 					clen++;
 				if (S[k][l] >= 0.0)
 					nlen++;
-
 			}
 		}
+		/* apply C-terminal padding. Position (nk, nl) refer to the index number of the last match */
 		if (align_flag & ALIGN_PAD) {
-			for (i = nk; i < len1; i++) {
+			for (i = nk + 1; i < len1; i++) {
 				t1[plen] = seq1[i];
 				t2[plen] = ALIGN_PAD_CHAR;
 				plen++;
 			}
-			for (j = nl; j < len2; j++) {
+			for (j = nl + 1; j < len2; j++) {
 				t1[plen] = ALIGN_PAD_CHAR;
 				t2[plen] = seq2[j];
 				plen++;
@@ -1186,8 +1186,8 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 		a->seq1 = char_string(seq1);
 		a->len2 = len2;
 		a->seq2 = char_string(seq2);
-		a->start1 = o1, a->start2 = o2;
-		a->end1 = nk, a->end2 = nl;
+		a->start1 = o1 + 1, a->start2 = o2 + 1; /* 1-based sequence start coordinates */
+		a->end1 = nk + 1, a->end2 = nl + 1;	/* 1-based sequence end coordinates */
 		a->aln1 = char_string(t1), free(t1);
 		a->aln2 = char_string(t2), free(t2);
 		a->plen = plen, a->alen = alen, a->mlen = mlen, a->glen = glen, a->ilen = ilen, a->olen = olen, a->clen = clen, a->nlen = nlen;
