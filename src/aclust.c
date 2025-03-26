@@ -160,11 +160,12 @@ int p_v = 0;			/* verbose flag, set to 1 for additional diagnostic output */
 double p_go = 12.0;		/* gap open = first gap penalty */
 double p_ge = 1.0;		/* gap extend = next gap penalty */
 int p_gx = 100;			/* maximum gap crossover length (set to 0 to deactivate) */
-int p_json = 1;			/* output alignments in pseudo-json format */
-int p_taln = 1;			/* output alignment as text */
-int p_baln = 1;			/* output alignment as binary */
+int p_maln = 0;			/* read multiple alignment */
+int p_jaln = 1;			/* write alignments as JSON */
+int p_taln = 0;			/* write alignment as text */
+int p_baln = 0;			/* write alignment as binary */
 int p_nonself = 0;		/* do not align with self (show only off-diagonal elements */
-int p_metadata = 0;		/* print tree with metadata comparing left and right branches */
+int p_metadata = 0;		/* print tree node metadata */
 
 char *scorematrixfile = NULL;
 char *f_dmxfilename = NULL;
@@ -641,9 +642,6 @@ char *facc[MAXENTRIES];
 char *fseq[MAXENTRIES];
 int fsrc[MAXENTRIES];		/* source fasta file names, worst case one sequence per file */
 /* int  *frti[MAXENTRIES]; residue index deactivated */
-
-/* Global parameters start with p_ */
-int p_m = 0;			/* multiple alignment input */
 
 void print_fasta()
 {
@@ -1354,37 +1352,22 @@ void align_stats(ALN *A, int expected_plen, double expected_ascore)
 	*/
 }
 
-double pair_malign(int fi, int fj)
-/* from pre-aligned pair of fasta elements fi, fj
-// return ScoreDist normalized to shortest of the two sequences
-// write alignment info to stdout in pseudo-JSON */
+ALN *pair_malign(int fi, int fj)
+/* return inferred alignment of fasta elements fi, fj */
 {
 	/* pre-aligned fasta sequences */
 	char *a1 = fseq[fi], *a2 = fseq[fj];
 	ALN *A = aln_obj(facc[fi], facc[fj], NULL, NULL, fseq[fi], fseq[fj]);
 	align_stats(A, -1, -1.0);
 
-	/* write alignments */
-	if (p_json)
-		aln_write_json(A);
-	if (p_taln)
-		aln_write_text(A);
-	if (p_baln)
-		aln_write_binary(A);
-
-	double d = A->sd;
-	aln_free(A);
-	return (d);
+	return(A);
 }
 
-double pair_align(int fi, int fj)
-/* align pair of fasta elements fi, fj
-// return ScoreDist normalized to shortest of the two sequences
-// write alignment info to stdout in pseudo-JSON */
+ALN *pair_align(int fi, int fj)
+/* return local alignment of  fasta elements fi, fj */
 {
-	/* going into the alignment: */
 	int align_flag = ALIGN_GAP | ALIGN_PAD | ALIGN_CROSS;
-	char *s1 = fseq[fi], *s2 = fseq[fj], *a1 = NULL, *a2 = NULL;
+	char *s1 = fseq[fi], *s2 = fseq[fj];
 	int o1, o2, n1 = strlen(s1), n2 = strlen(s2);
 
 	pair_score_matrix(fi, fj);	/* allocate global score and match matrix */
@@ -1396,17 +1379,7 @@ double pair_align(int fi, int fj)
 	A->name1 = char_string(facc[fi]);
 	A->name2 = char_string(facc[fj]);
 
-	/* write alignments */
-	if (p_json)
-		aln_write_json(A);
-	if (p_taln)
-		aln_write_text(A);
-	if (p_baln)
-		aln_write_binary(A);
-
-	double d = A->sd;
-	aln_free(A);
-	return (d);
+	return(A);
 }
 
 double **align_fasta()
@@ -1416,9 +1389,25 @@ double **align_fasta()
 {
 	int i, inext, j;
 	double **dmx = double_matrix(g_nent, g_nent);
-	for (i = 0; i < g_nent; i++)
-		for (j = (p_nonself ? i + 1 : i); j < g_nent; j++)
-			dmx[i][j] = dmx[j][i] = (p_m ? pair_malign(i, j) : pair_align(i, j));
+	ALN *A;
+	for (i = 0; i < g_nent; i++) {
+		for (j = (p_nonself ? i + 1 : i); j < g_nent; j++) {
+			A =  (p_maln ? pair_malign(i, j) : pair_align(i, j));
+
+			/* write alignments */
+			if (p_baln)
+				aln_write_binary(A);
+			if (p_jaln)
+				aln_write_json(A);
+			if (p_taln)
+				aln_write_text(A);
+
+			/* populate distance matrix with minlen score distance */
+			dmx[i][j] = dmx[j][i] = A->sd;
+
+			aln_free(A);
+		}
+	}
 	return (dmx);
 }
 
@@ -2571,20 +2560,21 @@ BNODE *bnode_embed_tree(int n, double **dmx)
 ACLUST  Generates pairwise alignments, distance matrix and phylogenetic tree from protein FASTA input files.\n\
 Input entries may be pre-aligned, for example Fasta format output produced by MAFFT, or unaligned.\n\
 \n\
-Required parameters:\n\
+Required:\n\
 	-s <path>		filepath and name of substitution score matrix (e.g., '../dat/BLOSUM62.txt')\n\
-Optional parameters:\n\
+Optional:\n\
 	-p <string>		prefix for all output files (default=name of first input fasta file)\n\
-	-d <integer>		embed dimension (default 20)\n\
 	-e <char>		(D) distance tree only, (S) distance+single embed trees, (F, default) distance+single+full embed trees\n\
+	-d <integer>		embed dimension (default 20)\n\
 	-dmxfile <my.dmx>	Skips alignment phase and reads directly distance matrix in labelI labelJ DIJ\n\
 	-go <float>		Gap open penalty\n\
 	-ge <float>		Gap extend penalty\n\
-Optional flags:\n\
-	-m 			activates to interpret input Fasta as MSA\n\
-	-metadata 		activates print of average left-right node pair distances within tree\n\
-Less important flags:\n\
-	-j			deactivates writing of JSON alignment file\n\
+Switches:\n\
+	-maln 			read multiple alignment fasta\n\
+	-metadata 		switch ON write node metadata in tree file\n\
+	-jaln			switch OFF write alignment as JSON file\n\
+	-taln			switch ON write alignment as text file\n\
+	-baln			switch ON write alignment as binary file (not currently supported)\n\
 	-nonself		deactivates self alignments\n\
 	-v			activates more verbose output\n\
 \n\
@@ -2692,6 +2682,7 @@ int pparse(int argc, char *argv[])
 				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
 			c++;
 		}
+		/* switch ON <-> OFF */
 		else if (strncmp(argv[c], "-nonself", 8) == 0) {
 			++c;
 			p_nonself = (p_nonself + 1) % 2;
@@ -2702,21 +2693,32 @@ int pparse(int argc, char *argv[])
 			p_metadata = (p_metadata + 1) % 2;
 			fprintf(stderr, "metadata flag set to %d\n", p_metadata);
 		}
-		else if (strncmp(argv[c], "-j", 2) == 0) {
+		else if (strncmp(argv[c], "-maln", 5) == 0) {
 			++c;
-			p_json = (p_json + 1) % 2;
-			fprintf(stderr, "json flag set to %d\n", p_json);
+			p_maln = (p_maln + 1)%2;
+			fprintf(stderr, "Read multiple alignment %d\n", p_maln);
 		}
-		else if (strncmp(argv[c], "-m", 2) == 0) {
+		else if (strncmp(argv[c], "-baln", 5) == 0) {
 			++c;
-			p_m = 1;
-			fprintf(stderr, "multiple align set to %d\n", p_m);
+			p_baln = (p_baln + 1)%2;
+			fprintf(stderr, "Write align binary %d\n", p_baln);
+		}
+		else if (strncmp(argv[c], "-jaln", 5) == 0) {
+			++c;
+			p_jaln = (p_jaln + 1)%2;
+			fprintf(stderr, "Write align json %d\n", p_jaln);
+		}
+		else if (strncmp(argv[c], "-taln", 5) == 0) {
+			++c;
+			p_taln = (p_taln + 1)%2;
+			fprintf(stderr, "Write align text %d\n", p_taln);
 		}
 		else if (strncmp(argv[c], "-v", 2) == 0) {
 			++c;
 			p_v++;
 			fprintf(stderr, "verbose flag set to %d\n", p_v);
 		}
+
 		/* remaining '-' cases HERE */
 		else if (strncmp(argv[c], "-", 1) == 0) {
 			fprintf(stderr, "assumed parameter [%d] '%s' not recognized\n", c, argv[c]), exit(1);
