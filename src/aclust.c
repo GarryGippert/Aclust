@@ -174,10 +174,14 @@ char *oprefix = NULL;
 FILE *jsnfp = NULL;		/* file pointer for writing alignment JSON line-by-line */
 FILE *alnfp = NULL;		/* file pointer for writing alignment free text */
 
-void j_osb(FILE * fp)
-/* output jsonified open square bracket */
+void j_opn(FILE * fp)
+/* open json line */
 {
+#ifdef JSONLONG
 	fprintf(fp, "[");
+#else
+	fprintf(fp, "{");
+#endif
 }
 
 void j_cmt(FILE * fp, char *comment)
@@ -200,40 +204,56 @@ void j_url(FILE * fp, char *url)
 void j_int(FILE * fp, int comma, char *key, int value, char *comment, char *url)
 /* output jsonified integer */
 {
+#ifdef JSONLONG
 	fprintf(fp, "{\"key\": \"%s\", \"value\": %d", key, value);
 	j_cmt(fp, comment);
 	j_url(fp, url);
 	fprintf(fp, "}");
+#else
+	fprintf(fp, "\"%s\": %d", key, value);
+#endif
 	if (comma == YES)
-		fprintf(fp, ",");
+		fprintf(fp, ", ");
 }
 
 void j_str(FILE * fp, int comma, char *key, char *value, char *comment, char *url)
 /* output jsonified string */
 {
+#ifdef JSONLONG
 	fprintf(fp, "{\"key\": \"%s\", \"value\": \"%s\"", key, value);
 	j_cmt(fp, comment);
 	j_url(fp, url);
 	fprintf(fp, "}");
+#else
+	fprintf(fp, "\"%s\": \"%s\"", key, value);
+#endif
 	if (comma == YES)
-		fprintf(fp, ",");
+		fprintf(fp, ", ");
 }
 
 void j_dbl(FILE * fp, int comma, char *key, double value, char *comment, char *url)
 /* output jsonified string */
 {
+#ifdef JSONLONG
 	fprintf(fp, "{\"key\": \"%s\", \"value\": %g", key, value);
 	j_cmt(fp, comment);
 	j_url(fp, url);
 	fprintf(fp, "}");
+#else
+	fprintf(fp, "\"%s\": %g", key, value);
+#endif
 	if (comma == YES)
-		fprintf(fp, ",");
+		fprintf(fp, ", ");
 }
 
-void j_csb(FILE * fp)
-/* output jsonified close square bracket */
+void j_cls(FILE * fp)
+/* close JSON line */
 {
+#ifdef JSONLONG
 	fprintf(fp, "]\n");
+#else
+	fprintf(fp, "}\n");
+#endif
 }
 
 double *double_vector(int n)
@@ -905,7 +925,7 @@ void aln_write_json(ALN *A)
 		free(filename);
 	}
 	/* JSON format parsable line-by-line */
-	j_osb(jsnfp);
+	j_opn(jsnfp);
 	/* input */
 	j_str(jsnfp, YES, "name1", A->name1, NULL, NULL);
 	j_int(jsnfp, YES, "len1", A->len1, NULL, NULL);
@@ -937,7 +957,7 @@ void aln_write_json(ALN *A)
 	j_dbl(jsnfp, YES, "sd1", A->sd1, NULL, NULL);
 	j_dbl(jsnfp, YES, "sd2", A->sd2, NULL, NULL);
 	j_dbl(jsnfp, NO, "sd", A->sd, NULL, NULL); /* last data element receives a NO to solve a json-related issue */
-	j_csb(jsnfp);
+	j_cls(jsnfp);
 	fflush(jsnfp);
 }
 
