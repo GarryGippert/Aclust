@@ -157,8 +157,8 @@ ACLUST was developed and written by Garry Paul Gippert, and packaged as a single
 #define SIGN(a)		( (a) < 0.0 ?   (-1.0) :    (1.0) )
 
 int p_v = 0;			/* verbose flag, set to 1 for additional diagnostic output */
-double p_go = 12.0;		/* gap open = first gap penalty */
-double p_ge = 1.0;		/* gap extend = next gap penalty */
+double p_go = 10.0;		/* gap open = first gap penalty */
+double p_ge = 0.5;		/* gap extend = next gap penalty */
 int p_gx = 100;			/* maximum gap crossover length (set to 0 to deactivate) */
 int p_maln = 0;			/* read multiple alignment */
 int p_jaln = 1;			/* write alignments as JSON */
