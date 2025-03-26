@@ -1856,22 +1856,22 @@ void bnode_indexi(BNODE * B, int *index, int *i)
 		fprintf(stderr, "bnode_indexi: B->left xor B->right in bnode_indexi\n"), exit(1);
 }
 
-void averms(double **mx, int n, int *index, int m, int *jndex, double *ave, double *rms)
-/* return average and rmsd of specific indices on left (n, index) and right (m, jndex) nodes */
+void avesd(double **mx, int n, int *index, int m, int *jndex, double *ave, double *sd)
+/* return average and population standard deviation of values at (n, index) vs (m, jndex) matrix elements */
 {
-	*ave = *rms = 0.0;
-	double sum = 0.0, cnt = 0.0, sqr = 0.0, v;
+	*ave = *sd = 0.0;
+	double val, sum = 0.0, cnt = 0.0, sqr = 0.0;
 	int i, j;
 	for (i = 0; i < n; i++)
 		for (j = 0; j < m; j++) {
-			v = mx[index[i]][jndex[j]];
-			sum += v;
+			val = mx[index[i]][jndex[j]];
+			sum += val;
 			cnt += 1.0;
-			sqr += v*v;
+			sqr += val * val;
 		}
 	if (cnt > 0.0){
 		*ave = sum/cnt;
-		*rms = sqrt(fabs(sqr/cnt - (*ave)*(*ave)));
+		*sd = sqrt(fabs(sqr/cnt - (*ave)*(*ave)));
 	}
 }
 
@@ -1887,10 +1887,14 @@ void bnode_print_metadata(FILE *fp, BNODE *left, BNODE *right)
 	int *jndex = int_vector(m), j = 0;
 	bnode_indexi(right, jndex, &j);
 
-	double dave, drms;
-	averms(global_dmx, n, index, m, jndex, &dave, &drms);
+	double pct, sd_pct;
+	avesd(global_imx, n, index, m, jndex, &pct, &sd_pct);
 
-	fprintf(fp, "[&dave=%.1f,drms=%.1f]", dave, drms);
+	double dis, sd_dis;
+	avesd(global_dmx, n, index, m, jndex, &dis, &sd_dis);
+
+	fprintf(fp, "[&pct=%.1f,dis=%.1f,sd_pct=%.1f,sd_dis=%.1f]", pct, dis, sd_pct, sd_dis);
+
 	free((char *)index);
 	free((char *)jndex);
 }
