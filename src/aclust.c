@@ -504,14 +504,14 @@ double blosum_pscore(double zscore, int qlen)
 
         /* print parameters once */
         if (!print_blosum_pscore_parameters) {
-                printf("# Blosum PSCORE parameters:\n");
-                printf("# Q = %d\n", qlen);
-                printf("# A = EVD_A_CONST %g + EVD_A_SLOPE %g * log(Q) = %g\n", EVD_A_CONST, EVD_A_SLOPE, A);
-                printf("# B = EVD_B_CONST %g + EVD_B_SLOPE %g * log(Q) = %g\n", EVD_B_CONST, EVD_B_SLOPE, B);
-                printf("# Z = %g\n", zscore);
-                printf("# P = exp((A - Z)/B - exp((A - Z)/B))/B = %g\n", P);
-                printf("# D = exp(-exp((A - Z)/B)) = %g\n", D);
-                printf("# S = -log10(1.0 - D) = %g (blosum pscore)\n", S);
+                fprintf(stderr, "Blosum PSCORE parameters:\n");
+                fprintf(stderr, " Q = %d\n", qlen);
+                fprintf(stderr, " A = EVD_A_CONST %g + EVD_A_SLOPE %g * log(Q) = %g\n", EVD_A_CONST, EVD_A_SLOPE, A);
+                fprintf(stderr, " B = EVD_B_CONST %g + EVD_B_SLOPE %g * log(Q) = %g\n", EVD_B_CONST, EVD_B_SLOPE, B);
+                fprintf(stderr, " Z = %g\n", zscore);
+                fprintf(stderr, " P = exp((A - Z)/B - exp((A - Z)/B))/B = %g\n", P);
+                fprintf(stderr, " D = exp(-exp((A - Z)/B)) = %g\n", D);
+                fprintf(stderr, " S = -log10(1.0 - D) = %g (blosum pscore)\n", S);
                 print_blosum_pscore_parameters++;
         }
         return (S);
