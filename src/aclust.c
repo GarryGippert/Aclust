@@ -913,9 +913,11 @@ void aln_write_json(ALN *A)
 	j_int(jsnfp, YES, "len2", A->len2, NULL, NULL);
 	/* alignment strings */
 	j_str(jsnfp, YES, "aln1", A->aln1, NULL, NULL);
-	j_int(jsnfp, YES, "o1", A->start1, NULL, NULL);
+	j_int(jsnfp, YES, "start1", A->start1, NULL, NULL);
+	j_int(jsnfp, YES, "end1", A->end1, NULL, NULL);
 	j_str(jsnfp, YES, "aln2", A->aln2, NULL, NULL);
-	j_int(jsnfp, YES, "o2", A->start2, NULL, NULL);
+	j_int(jsnfp, YES, "start2", A->start2, NULL, NULL);
+	j_int(jsnfp, YES, "end2", A->end2, NULL, NULL);
 	/* alignment counts and scores */
 	j_int(jsnfp, YES, "plen", A->plen, NULL, NULL);
 	j_int(jsnfp, YES, "alen", A->alen, NULL, NULL);
@@ -1186,8 +1188,8 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 		a->seq1 = char_string(seq1);
 		a->len2 = len2;
 		a->seq2 = char_string(seq2);
-		a->start1 = o1 + 1, a->start2 = o2 + 1; /* 1-based sequence start coordinates */
-		a->end1 = nk + 1, a->end2 = nl + 1;	/* 1-based sequence end coordinates */
+		a->start1 = o1 + 1, a->end1 = nk;	/* 1-based sequence start and end coordinates */
+		a->start2 = o2 + 1, a->end2 = nl;	/* 1-based sequence start and end coordinates */
 		a->aln1 = char_string(t1), free(t1);
 		a->aln2 = char_string(t2), free(t2);
 		a->plen = plen, a->alen = alen, a->mlen = mlen, a->glen = glen, a->ilen = ilen, a->olen = olen, a->clen = clen, a->nlen = nlen;
@@ -2691,7 +2693,7 @@ int pparse(int argc, char *argv[])
 		else if (strncmp(argv[c], "-metadata", 9) == 0) {
 			++c;
 			p_metadata = (p_metadata + 1) % 2;
-			fprintf(stderr, "metadata flag set to %d\n", p_metadata);
+			fprintf(stderr, "write node metadata %d\n", p_metadata);
 		}
 		else if (strncmp(argv[c], "-maln", 5) == 0) {
 			++c;
