@@ -198,7 +198,7 @@ int p_jaln = 1;			/* write alignments as JSON */
 int p_taln = 0;			/* write alignment as text */
 int p_baln = 0;			/* write alignment as binary */
 int p_nonself = 0;		/* do not align with self (show only off-diagonal elements */
-int p_metadata = 0;		/* print tree node metadata */
+int p_metadata = 1;		/* print tree node metadata */
 int p_cross = 0;		/* average distances across leaf nodes */
 
 char *scorematrixfile = NULL;
@@ -2146,6 +2146,7 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
         				bnode_indexi(bvec[i], rindex, &nr);
         				avesd(global_dmx, nl, lindex, nr, rindex, &dis, &sd_dis);
 					smx[i][m] = smx[m][i] = dis;
+					if (p_v > 1)
 					fprintf(stderr, "D m %d (%d) i %d (%d) = %g +/- %g\n",
 						m, nl, i, nr, dis, sd_dis);
 				}
@@ -2630,9 +2631,9 @@ Optional:\n\
 	-go <float>		Gap open penalty\n\
 	-ge <float>		Gap extend penalty\n\
 Switches:\n\
-	-c			switch ON average distances from leaf nodes\n\
+	-c			switch OFF average distances from leaf nodes\n\
 	-maln 			read multiple alignment fasta\n\
-	-metadata 		switch ON write node metadata in tree file\n\
+	-metadata 		switch OFF write node metadata in tree file\n\
 	-jaln			switch OFF write alignment as JSON file\n\
 	-taln			switch ON write alignment as text file\n\
 	-baln			switch ON write alignment as binary file (not currently supported)\n\
@@ -2887,8 +2888,6 @@ double **read_dmx(char *filename)
 	return (global_dmx);
 }
 
-/* elapsed CPU time */
-
 int main(int argc, char *argv[])
 {
 	float stime = elapsed(0.0);
@@ -2940,6 +2939,8 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "Distance tree %s\n", treefile);
 	write_tree(dree, treefile);
 	free(treefile);
+	fprintf(stderr, "Aclust after Distance tree %.3f elapsed CPU seconds, %d clock seconds\n",
+		elapsed(stime), clocktime(ctime));
 	if (p_e == 'D')
 		fprintf(stderr, "Halt after distance tree\n"), exit(0);
 
@@ -2951,6 +2952,8 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "Single embed tree %s\n", treefile);
 	write_tree(tree, treefile);
 	free(treefile);
+	fprintf(stderr, "Aclust after Single embed tree %.3f elapsed CPU seconds, %d clock seconds\n",
+		elapsed(stime), clocktime(ctime));
 	if (p_e == 'S')
 		fprintf(stderr, "Halt after single embed tree\n"), exit(0);
 
@@ -2963,6 +2966,8 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "Full recursive embed tree %s\n", treefile);
 	write_tree(tree, treefile);
 	free(treefile);
+	fprintf(stderr, "Aclust after Full recursive embed tree %.3f elapsed CPU seconds, %d clock seconds\n",
+		elapsed(stime), clocktime(ctime));
 
 	char *binary_treefile = char_string("binary_treefile.btf");
 	write_tree_binary(tree, binary_treefile);
