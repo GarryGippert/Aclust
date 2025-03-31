@@ -134,6 +134,39 @@ ACLUST was developed and written by Garry Paul Gippert, and packaged as a single
 #include <string.h>
 #include <math.h>
 
+#include <sys/types.h>
+#include <time.h>
+#include <sys/times.h>
+#include <limits.h>
+#include <unistd.h>
+
+int clocktime(int prev)
+/* return integer seconds (clock time) since prev */
+{
+        time_t t;
+        t = time(NULL);
+        return (t - prev);
+}
+
+float elapsed(float stime)
+/* return elapsed seconds (CPU time) since stime */
+{
+        struct tms buffer;
+        float f, hz_;
+        times(&buffer);
+        f = buffer.tms_utime + buffer.tms_stime;
+#if defined(_SC_CLK_TCK)
+        hz_ = sysconf(_SC_CLK_TCK);
+#else
+        hz_ = HZ;
+#endif
+        f /= hz_;
+        f -= stime;
+        if (f <= 0.0)
+                return (0.0);
+        return (f);
+}
+
 #define MAXSEQUENCELEN 10000
 #define MAXFILENAME 1000
 #define MAXLINELEN 1000
@@ -166,6 +199,7 @@ int p_taln = 0;			/* write alignment as text */
 int p_baln = 0;			/* write alignment as binary */
 int p_nonself = 0;		/* do not align with self (show only off-diagonal elements */
 int p_metadata = 0;		/* print tree node metadata */
+int p_cross = 0;		/* average distances across leaf nodes */
 
 char *scorematrixfile = NULL;
 char *f_dmxfilename = NULL;
@@ -1976,37 +2010,20 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 
 	if (dmx_flag & DMX_ONE) { fprintf(stderr, "DMX ONE is coded\n"); }
 	else
-	if (dmx_flag & DMX_TWO) { printf("DMX TWO\n"), exit(0); }
-	else
-	if (dmx_flag & DMX_THREE) { printf("DMX THREE\n"), exit(0); }
-	else
-	if (dmx_flag & DMX_FOUR) { printf("DMX FOUR\n"), exit(0); }
-	else
-	if (dmx_flag & DMX_FIVE) { printf("DMX FIVE\n"), exit(0); }
-	else
-	if (dmx_flag & DMX_SIX) { printf("DMX SIX\n"), exit(0); }
-	else
-	if (dmx_flag & DMX_SEVEN) { printf("DMX SEVEN\n"), exit(0); }
+	if (dmx_flag & DMX_TWO) { fprintf(stderr, "DMX TWO is coded\n"); }
 	else { printf("DMX NONE of the above\n"), exit(1); }
 
-	/* algorithm: // allocate BNODE vector of length 2N-1, with N of them with 'natural' index numbers (leaf nodes)
-	   // and N-1 of them with index number -1 (tree nodes) without assigning any of them parentage. // allocate
-	   integer 'use' vector of length 2N-1, // alternatively double 'weight' vector of length 2N-1, 1.0 for leafs
-	   0.0 for others... // allocate dmatrix of length 2N-1 x 2N-1, with first N positions taken by actual
-	   distances // find the minimum non-used element in the matrix, join the nodes. */
-
+	/* total number of nodes needed for a binary tree is 2N - 1 where N = number of leaf nodes */
 	int nodes = 2 * n - 1;
 	if (nodes > MAXNODES)
 		fprintf(stderr, "bnode_tree: nodes %d > MAXNODES %d\n", nodes, MAXNODES), exit(1);
 
+	int *lindex = int_vector(nodes), nl, *rindex = int_vector(nodes), nr;
 	BNODE **bvec = bnode_vec(nodes, 1);
 
-	/* first N BNODE elements are leaf nodes */
 	int i;
 	for (i = 0; i < n; i++) {
 		bvec[i]->index = (index ? index[i] : i);
-		//bvec[i]->dim = dim;
-		//bvec[i]->pos = double_vector_copy(dim, pos[i]);
 	}
 
 	/* extended copy of dmx, availability vector */
@@ -2032,11 +2049,11 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 	}
 
 	/* parent will be one of the allocated nodes */
-	BNODE *P;
-	P = NULL;
+	BNODE *P = NULL;
 
 	/* nearest neighbor-joining algorithm */
-	int m = n;		/* next available interior node */
+	/* M is the next available index after the N leaf nodes */
+	int m = n;
 	while (1) {
 		double mins = 1e36;
 		int mini = MAXNODES;
@@ -2062,15 +2079,13 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 		if (p_v > 1)
 			fprintf(stderr, "found new pair %d %d\n", mini, minj);
 
-		/* point to next available node */
+		/* Parent is next node and children are left and right subtrees */
 		P = bvec[m];
-
-		/* left and right subtrees */
 		BNODE *A = bvec[mini];
 		BNODE *B = bvec[minj];
 
-		/* optionally 'rotate' left and right */
-		if (p_r == 'N') {	/* no rotation */
+		/* Put the most populated subtree on left or right, or not. */
+		if (p_r == 'N') {
 			P->left = A;
 			P->right = B;
 		} else {
@@ -2090,49 +2105,53 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 		P->left->parent = P;
 		P->right->parent = P;
 
-		/* assign left, right and subtree->parent distances */
+		/* weighted branch lengths to children */
 		double L = (float)bnode_count(P->left);
 		double R = (float)bnode_count(P->right);
 		P->left_distance = P->left->parent_distance = smx[mini][minj] * R / (L + R);
 		P->right_distance = P->right->parent_distance = smx[mini][minj] * L / (L + R);
 
+		/* massive amounts of debugging information */
 		if (p_v > 1) {
 			fprintf(stderr, "intermediate tree\n");
 			bnode_print(stderr, P);
+			bnode_trace(P->left);
+			bnode_trace(P->right);
 		}
 
-		if (p_v > 1)
-			bnode_trace(P->left);
-
-		if (p_v > 1)
-			bnode_trace(P->right);
-
-		/* update distance matrix */
+		/* Found i,j nodes are now merged and not longer available */
 		avail[mini] = 0;
 		avail[minj] = 0;
 
+		/* update distances to node m from remaining available nodes  */
+        	double dis, sd_dis;
 		if (dmx_flag & DMX_ONE) {
 			/* Average distance model */
-			double del;
 			for (i = 0; i < m; i++) {
 				if (avail[i]) {
-					del = (smx[i][mini] + smx[i][minj]) / 2.0;
-					smx[i][m] = smx[m][i] = del;
+					dis = (smx[i][mini] + smx[i][minj]) / 2.0;
+					smx[i][m] = smx[m][i] = dis;
 				}
 			}
 		}
 		else
 		if (dmx_flag & DMX_TWO) {
-			/* Average leaf-to-leaf across branches distance model */
-			fprintf(stderr, "DMX_TWO not implemented yet\n"); exit(1);
-			double del;
+			/* Average leaf-to-leaf distance between members of new node m,
+			 * and each remaining available node i */
+			nl = 0;
+        		bnode_indexi(P, lindex, &nl);
 			for (i = 0; i < m; i++) {
 				if (avail[i]) {
-					del = (smx[i][mini] + smx[i][minj]) / 2.0;
-					smx[i][m] = smx[m][i] = del;
+					nr = 0;
+        				bnode_indexi(bvec[i], rindex, &nr);
+        				avesd(global_dmx, nl, lindex, nr, rindex, &dis, &sd_dis);
+					smx[i][m] = smx[m][i] = dis;
+					fprintf(stderr, "D m %d (%d) i %d (%d) = %g +/- %g\n",
+						m, nl, i, nr, dis, sd_dis);
 				}
 			}
 		}
+
 		else {
 			printf("dmx_flag value %d apparently not coded\n", dmx_flag);
 			fprintf(stderr, "dmx_flag value %d apparently not coded\n", dmx_flag);
@@ -2159,10 +2178,10 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 	if (!P)
 		fprintf(stderr, "bnode_tree: tree is NULL\n"), exit(1);
 
-	/* free */
 	double_matrix_free(nodes, nodes, smx);
 	int_vector_free(nodes, avail);
-	/* NO bnode_vec_free(bvec, nodes); */
+        int_vector_free(nodes, lindex);
+        int_vector_free(nodes, rindex);
 
 	return P;
 }
@@ -2574,6 +2593,8 @@ BNODE *bnode_distance_tree(int n, double **dmx)
 {
 	int *index = int_vector_ramp(n);
 	int dmx_flag = DMX_ONE;
+	if (p_cross)
+		dmx_flag = DMX_TWO;
 	BNODE *P = bnode_tree_dmx(n, index, dmx, dmx_flag);
 	return(P);
 }
@@ -2609,6 +2630,7 @@ Optional:\n\
 	-go <float>		Gap open penalty\n\
 	-ge <float>		Gap extend penalty\n\
 Switches:\n\
+	-c			switch ON average distances from leaf nodes\n\
 	-maln 			read multiple alignment fasta\n\
 	-metadata 		switch ON write node metadata in tree file\n\
 	-jaln			switch OFF write alignment as JSON file\n\
@@ -2722,6 +2744,11 @@ int pparse(int argc, char *argv[])
 			c++;
 		}
 		/* switch ON <-> OFF */
+		else if (strncmp(argv[c], "-c", 2) == 0) {
+			++c;
+			p_cross = (p_cross + 1) % 2;
+			fprintf(stderr, "cross flag set to %d\n", p_cross);
+		}
 		else if (strncmp(argv[c], "-nonself", 8) == 0) {
 			++c;
 			p_nonself = (p_nonself + 1) % 2;
@@ -2860,9 +2887,12 @@ double **read_dmx(char *filename)
 	return (global_dmx);
 }
 
+/* elapsed CPU time */
+
 int main(int argc, char *argv[])
 {
-	char *treefile = NULL;
+	float stime = elapsed(0.0);
+	int ctime = clocktime(0);
 	int c = pparse(argc, argv);
 	if (!oprefix) {
 		oprefix = char_string("this");
@@ -2905,7 +2935,7 @@ int main(int argc, char *argv[])
 
 	/* Construct tree based on distance matrix alone.  */
 	BNODE *dree = bnode_distance_tree(g_nent, dmx);
-	treefile = char_vector(strlen(oprefix) + strlen(".dree.txt") + 1);
+	char *treefile = char_vector(strlen(oprefix) + strlen(".dree.txt") + 1);
 	sprintf(treefile, "%s%s", oprefix, ".dree.txt");
 	fprintf(stderr, "Distance tree %s\n", treefile);
 	write_tree(dree, treefile);
@@ -2936,6 +2966,8 @@ int main(int argc, char *argv[])
 
 	char *binary_treefile = char_string("binary_treefile.btf");
 	write_tree_binary(tree, binary_treefile);
+	fprintf(stderr, "Aclust complete %.3f elapsed CPU seconds, %d clock seconds\n",
+		elapsed(stime), clocktime(ctime));
 
 	exit(0);
 }
