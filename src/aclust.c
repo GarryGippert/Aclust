@@ -189,6 +189,7 @@ float elapsed(float stime)
 #define NEARZERO(a)	(fabs(a) < 10.0*EPSILON ? 0.0 : (a))
 #define SIGN(a)		( (a) < 0.0 ?   (-1.0) :    (1.0) )
 
+int p_h = 0;			/* help flag - print variables and exit */
 int p_v = 0;			/* verbose flag, set to 1 for additional diagnostic output */
 double p_go = 10.0;		/* gap open = first gap penalty */
 double p_ge = 0.5;		/* gap extend = next gap penalty */
@@ -2683,10 +2684,6 @@ int pparse(int argc, char *argv[])
 			f_dmxfilename = char_string(argv[c++]);
 			fprintf(stderr, "f_dmxfilename set to '%s'\n", f_dmxfilename);
 		}
-		else if (strncmp(argv[c], "-h", 2) == 0) {
-			++c;
-			command_line_help(c, argc, argv);
-		}
 		else if (strncmp(argv[c], "-s", 2) == 0) {
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
@@ -2785,6 +2782,11 @@ int pparse(int argc, char *argv[])
 			p_v++;
 			fprintf(stderr, "verbose flag set to %d\n", p_v);
 		}
+		else if (strncmp(argv[c], "-h", 2) == 0) {
+			++c;
+			p_h++;
+			fprintf(stderr, "help flag set to %d\n", p_h);
+		}
 
 		/* remaining '-' cases HERE */
 		else if (strncmp(argv[c], "-", 1) == 0) {
@@ -2797,6 +2799,28 @@ int pparse(int argc, char *argv[])
 		}
 
 	}
+	
+	fprintf(stderr, "Command line parameter summary:\n");
+	fprintf(stderr, " f_dmxfilename '%s'\n", f_dmxfilename);
+	fprintf(stderr, " scorematrix file '%s'\n", scorematrixfile);
+	fprintf(stderr, " output prefix '%s'\n", oprefix);
+	fprintf(stderr, " dimension %d\n", p_dim);
+	fprintf(stderr, " Embed %c\n", p_e);
+	fprintf(stderr, " Gap open %g\n", p_go);
+	fprintf(stderr, " Gap extension %g\n", p_ge);
+	fprintf(stderr, " Gap max crossover length %d\n", p_gx);
+	fprintf(stderr, " cross flag %d\n", p_cross);
+	fprintf(stderr, " nonself flag %d\n", p_nonself);
+	fprintf(stderr, " metadata flag %d\n", p_metadata);
+	fprintf(stderr, " multiple alignment flag %d\n", p_maln);
+	fprintf(stderr, " write json alignments %d\n", p_jaln);
+	fprintf(stderr, " write text alignments %d\n", p_taln);
+	fprintf(stderr, " write binary alignments %d\n", p_baln);
+	fprintf(stderr, " verbose flag %d\n", p_v);
+	fprintf(stderr, " help flag %d\n", p_h);
+	if (p_h)
+		command_line_help(c, argc, argv);
+
 	/* some validation */
 	if (strchr("DSF", p_e) == NULL)
 		fprintf(stderr, "Parameter -e %c invalid, must be D, S or F\n", p_e), exit(1);
