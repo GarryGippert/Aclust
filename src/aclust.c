@@ -205,7 +205,7 @@ int p_alignf = 0;		/* read alignfastas output instead of Fasta files */
 
 /* Treebuilding */
 char p_e = 'D';			/* 'D' = distance tree, 'S' = (plus) single embed tree, 'F' = (plus) full recursive embed tree */
-int p_dave = 0;			/* distance averaging flag 1= leaf distances, 0=branch distances */
+int p_dave = 0;			/* distance averaging flag 0=branch distances, 1= leaf distances */
 
 char *scorematrixfile = NULL;
 char *f_dmxfilename = NULL;
@@ -1843,8 +1843,9 @@ void bnode_indexi(BNODE * B, int *index, int *i)
 		fprintf(stderr, "bnode_indexi: B->left xor B->right in bnode_indexi\n"), exit(1);
 }
 
-void avesd(double **mx, int n, int *index, int m, int *jndex, double *ave, double *sd)
-/* return average and population standard deviation of values at (n, index) vs (m, jndex) matrix elements */
+void between(double **mx, int n, int *index, int m, int *jndex, double *ave, double *sd)
+/* average and population standard deviation between points in two sets (n, index) vs (m, jndex)
+ * from matrix elements */
 {
 	*ave = *sd = 0.0;
 	double val, sum = 0.0, cnt = 0.0, sqr = 0.0;
@@ -1862,28 +1863,65 @@ void avesd(double **mx, int n, int *index, int m, int *jndex, double *ave, doubl
 	}
 }
 
+void within(double **mx, int n, int *index, double *ave, double *sd)
+/* average and population standard deviation among points in a set (n, index)
+ * from matrix elements */
+{
+	*ave = *sd = 0.0;
+	double val, sum = 0.0, cnt = 0.0, sqr = 0.0;
+	int i, j;
+	for (i = 0; i < n; i++)
+		for (j = i+1; j < n; j++) {
+			val = mx[index[i]][index[j]];
+			sum += val;
+			cnt += 1.0;
+			sqr += val * val;
+		}
+	if (cnt > 0.0){
+		*ave = sum/cnt;
+		*sd = sqrt(fabs(sqr/cnt - (*ave)*(*ave)));
+	}
+}
+
 void bnode_print_metadata(FILE *fp, BNODE *left, BNODE *right)
 /* print metadata comparing left and right branches */
 {
 
-	int n = bnode_count(left);	/* number of leaves in left subtree */
+	/* leaf nodes in left subtree */
+	int n = bnode_count(left);
 	int *index = int_vector(n), i = 0;
 	bnode_indexi(left, index, &i);
 
-	int m = bnode_count(right);	/* number of leaves in right subtree */
+	/* leaf nodes in right subtree */
+	int m = bnode_count(right);
 	int *jndex = int_vector(m), j = 0;
 	bnode_indexi(right, jndex, &j);
 
-	double pct, sd_pct;
-	avesd(global_imx, n, index, m, jndex, &pct, &sd_pct);
+	/* leaf nodes in combined left and right subtrees */
+	int o = n + m;
+	int *kndex = int_vector(o), k = 0;
+	bnode_indexi(left, kndex, &k);
+	bnode_indexi(right, kndex, &k);
 
-	double dis, sd_dis;
-	avesd(global_dmx, n, index, m, jndex, &dis, &sd_dis);
+	double apct, sd_apct;
+	within(global_imx, o, kndex, &apct, &sd_apct);
 
-	fprintf(fp, "[&pct=%.1f,dis=%.1f,sd_pct=%.1f,sd_dis=%.1f]", pct, dis, sd_pct, sd_dis);
+	double adis, sd_adis;
+	within(global_dmx, o, kndex, &adis, &sd_adis);
+
+	fprintf(fp, "[&apct=%.1f,adis=%.1f,sd_apct=%.1f,sd_adis=%.1f", apct, adis, sd_apct, sd_adis);
+
+	double bpct, sd_bpct;
+	between(global_imx, n, index, m, jndex, &bpct, &sd_bpct);
+
+	double bdis, sd_bdis;
+	between(global_dmx, n, index, m, jndex, &bdis, &sd_bdis);
+
+	fprintf(fp, ",&bpct=%.1f,bdis=%.1f,sd_bpct=%.1f,sd_bdis=%.1f]", bpct, bdis, sd_bpct, sd_bdis);
 
 	free((char *)index);
 	free((char *)jndex);
+	free((char *)kndex);
 }
 
 /* print binary tree */
@@ -2096,7 +2134,7 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 				if (avail[i]) {
 					nr = 0;
         				bnode_indexi(bvec[i], rindex, &nr);
-        				avesd(global_dmx, nl, lindex, nr, rindex, &dis, &sd_dis);
+        				between(global_dmx, nl, lindex, nr, rindex, &dis, &sd_dis);
 					smx[i][m] = smx[m][i] = dis;
 					if (p_v > 1)
 					fprintf(stderr, "D m %d (%d) i %d (%d) = %g +/- %g\n",
