@@ -1,68 +1,71 @@
 /* ACLUST
 
-Aclust generates a phylogenetic tree from sequence pairwise distances,
-computed either by pre-aligned (multiple aligned) FASTA input, or by
-generating all-vs-all pairwise local alignments using SW.
+Aclust reads one or more Fasta files, computes or interpolates sequence
+pairwise alignments, and builds a nearest-neighbor joining (NNJ) tree
+from the matrix of pairwise distances.
+
+
+Sequence alignments:
+
+Supply a multiple alignment by using the -maln command line flag,
+otherwise local sequence pairwise alignments are computed using a modified
+local alignment (Smith & Waterman, 1981) with affine gap penalties. The
+(unpublished) modification allows a gap crossover (gap that starts in one
+sequence and ends in the other). A gap crossover allowance may slightly
+improve some alignments, but incurs additional algorithmic cost. By default
+the BLOSUM62 amino-acid substitution score matrix is used.
+
+	output file: prefix.aln.js and/or prefix.aln.txt
+
+The user may skip computing or interpolating alignments by either
+supplying a distance matrix using the -dmxfile parameter, or reading
+ALIGNFASTAS files (local convention) using the -alignf flag.
+
+Distance matrix:
+
+Distances are computed based on a modified ScoreDist (Sonnhammer &
+Hollich 2005). The (unpublished) modification normalizes the expectation
+score (denominator of ScoreDist) to sequence length instead of alignment
+length. By convention the shorter of the two sequences in a given pairwise
+alignment is used. Sequence length normalization has the effect of pushing
+apart sequences that only align along a short matching segment.
+
+	output file: prefix.dmx.txt
+
+Tree building:
+
+Command line parameter -e D
+
+A Nearest Neighbor Joining (NNJ) tree is computed from the Distance matrix.
+At each iteration two 'closest' nodes are combined into a single new node.
+Distances from the new node to all remaining nodes are computed using branch
+length averaging or leaf-distance averaging. (TODO - add text describing
+which command line flag applies.)
+
+	output file: prefix.dree.txt
+
+Command line paramter -e S
+
+A second tree may be computed from a Single iteration of the distance geometry
+EMBED algorithm (Crippen & Havel, 1988) applied to the distance matrix. By
+default the first 20 most significant eigenvectors are found. Thereafter a tree
+is constructed by NNJ in the space of orthogonal coordinates (scaled eigenvectors)
+with new node positions computed usign direct coordinate averaging.
+
+	output file: prefix.tree0.txt
+
+Command line parameter -e F
+
+A third tree may be computed from a Full recursive application of EMBED and NNJ 
+for each subtree of the first EMBED tree. This may be computationally expensive
+but may produce nice trees in some situations.
+
+	output file: prefix.tree.txt
 
 Please contact the author Garry Paul Gippert, GarryG@dtu.dk, DTU Bioengineering,
 Danish Technical University, with questions or for more information.
 
-Distance-matrix approach.
-
-NNJ in distance space, and embedded coordinate space.
-
-1. For each pair of input sequences, a distance is computed using a modified version of ScoreDist
-(Sonnhammer & Hollich, 2005). Input sequences may represent a multiple alignment, OR, if the input
-sequences are unaligned, pairwise protein sequence alignments are computed using a local alignment
-algorithm (Smith & Waterman, 1981) with affine gap penalties. The Blosum62 amino-acid substitution
-score matrix is used to determine alignment match scores.
-
-2. The distance matrix is embedded into orthogonal coordinates using metric matrix distance geometry
-(for example Crippen & Havel, 1988).
-
-3. A nearest-neighbor joining (bifurcating) tree is computed in the orthogonal coordinate space.
-This is an iterative process in which two (nearest) nodes are replaced by one node at their weighted
-average position, etc., until a single root node is reached.
-
-4. Starting with the root node of the tree, points within each left and right sub-branch are
-independently re-embedded (step 2) and re-joined (step 3). The procedure is repeated recursively,
-gradually removing deleterious effects caused by large-but-inaccurate distances that arise between
-sequences sharing low homology.
-
-Input file(s) contain protein sequences in Fasta format.
-
-Output files produced: (all with shared prefix)
-        prefix_aln.txt  Text (somewhat human readable) alignments, useful in trouble-shooting.
-        prefix_aln.js   JSON-parsable details of each pairwise alignment, useful to parse later.
-        prefix_dmx.txt  Distance matrix in plain text format <labelI> <labelJ> <distanceIJ>.  not needed.
-	prefix_dree.txt	Distance matrix NNJ tree, Newick format.
-        prefix_tree0.txt Metric matrix embed tree, Newick-format.
-        prefix_tree.txt Recursively refined embed tree, Newick-format.
-
 ACLUST was developed and written by Garry Paul Gippert, and packaged as a single C source file in 2023.
-
-Copyright 2022 Novozymes A/S
-
-This license covers all content within the provide data 
-package, that originates from Novozymes A/S and delivered as 
-'Garry-Paul-Gippert_data-extract_1.tar.gz' on 31.01.2022. 
-Other content within the package that e.g. is obtained from 
-external sources, collaborators or public sources is not 
-covered but should respect all license restrictions that may 
-be associated. 
-
-Permission is hereby granted, free of charge, to any person 
-obtaining a copy of this software and associated documentation 
-files (the "Software") to utilize, copy, modify, merge, 
-distribute and to permit persons to whom the Software is 
-furnished to do so, subject to the following conditions:
-
-THE CONTENT CANNOT BE INTEGRATED OR SOLD FOR COMMERCIAL USE IN 
-ANY FORM. ALL MATERIAL WITHIN THIS DATA PACKAGE ORIGINATING 
-FROM NOVOZYMES A/S IS FOR NON-COMMCERIAL USE ONLY.
-
-The above copyright notice and this permission notice shall be 
-included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
 EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES 
@@ -81,7 +84,8 @@ Novozymes is adhered to, and is preserved and distributed within all
 copies of this code and derivative works. Signed,
 Garry Paul Gippert Nov 23, 2023
 */
-/* ACLUST Additional notes:
+
+/* Supplementary material
 
 The gap affine penalty used here allows a gap 'cross over' with no additional gap-open penalty.  A
 cross-over gap starts in one alignment string and ends in the other alignment string, with no
@@ -141,7 +145,7 @@ ACLUST was developed and written by Garry Paul Gippert, and packaged as a single
 #include <unistd.h>
 
 int clocktime(int prev)
-/* return integer seconds (clock time) since prev */
+/* return seconds (clock time) since prev */
 {
         time_t t;
         t = time(NULL);
@@ -149,7 +153,7 @@ int clocktime(int prev)
 }
 
 float elapsed(float stime)
-/* return elapsed seconds (CPU time) since stime */
+/* return seconds (CPU time) since stime */
 {
         struct tms buffer;
         float f, hz_;
@@ -182,8 +186,6 @@ float elapsed(float stime)
 #define ALIGN_GAP	0x0001	/* enable GAP */
 #define ALIGN_PAD	0x0002	/* enable PAD */
 #define ALIGN_CROSS	0x0004	/* enable gap cross-over */
-#define ALIGN_BODY	0x0008	/* enable gap body-gaps (not recommended) */
-
 
 #define	EPSILON		1.0e-8
 #define NEARZERO(a)	(fabs(a) < 10.0*EPSILON ? 0.0 : (a))
@@ -197,10 +199,13 @@ int p_gx = 100;			/* maximum gap crossover length (set to 0 to deactivate) */
 int p_maln = 0;			/* read multiple alignment */
 int p_jaln = 1;			/* write alignments as JSON */
 int p_taln = 0;			/* write alignment as text */
-int p_baln = 0;			/* write alignment as binary */
 int p_nonself = 0;		/* do not align with self (show only off-diagonal elements */
 int p_metadata = 1;		/* print tree node metadata */
-int p_cross = 0;		/* average distances across leaf nodes */
+int p_alignf = 0;		/* read alignfastas output instead of Fasta files */
+
+/* Treebuilding */
+char p_e = 'D';			/* 'D' = distance tree, 'S' = (plus) single embed tree, 'F' = (plus) full recursive embed tree */
+int p_dave = 0;			/* distance averaging flag 1= leaf distances, 0=branch distances */
 
 char *scorematrixfile = NULL;
 char *f_dmxfilename = NULL;
@@ -622,7 +627,6 @@ void print_scorematrix()
 			printf("%2g ", blosum_mtx[i][j]);
 		printf("\n");
 	}
-	/* Note: Command line 'diff' to compare the read and expected values of the matrix. */
 }
 
 void read_scorematrix(char *filename)
@@ -708,6 +712,11 @@ void print_fasta()
 /* used in parsing text */
 char line[MAXLINELEN], text[MAXLINELEN], acc[MAXLINELEN], seq[MAXSEQUENCELEN];
 
+/* ALIGNFASTAS one-line output parsing
+#~ IxJ Protein1 Len1 Protein2 Len2 Plen Alen Mlen Ilen Glen Olen Clen Nlen I/M As Ms A' M' Ab Mb Zscore Pscore Ms1 Ms2 Msr Sdis0 SDis1 Sdis2 SDis
+00x00 cazy104635-Meloidogyne_incognita-GT66    759 cazy104635-Meloidogyne_incognita-GT66    759    759    759    759    759 0      0    759    759 1        3979   3979 1065.59 1065.59 1537.32 1537.32 85.9893     15   3979   3979   -759     -0 -0     -0     -0
+*/
+
 void read_fasta(char *filename)
 /* read simple sequence fasta file side effect: updates char *facc and *fseq and fsrc */
 {
@@ -788,7 +797,7 @@ void pair_score_matrix(int f1, int f2)
 	for (i = 0; i < n1; i++)
 		for (j = 0; j < n2; j++)
 			global_score_matrix[i][j] = scorematrix_element(s1[i], s2[j]);
-	/* edges of score matrix contain sequence I and sequence J self-scores */
+	/* edges of score matrix contain sequence II and JJ self-scores */
 	for (i = 0; i < n1; i++)
 		global_score_matrix[i][n2] = scorematrix_element(s1[i], s1[i]);
 	for (j = 0; j < n2; j++)
@@ -799,7 +808,7 @@ double **global_T = NULL, **global_U = NULL, **global_V = NULL;
 int global_N = 0;
 
 double align_score(char *s1, char *s2, int n1, int n2, double **S, double **M, double fg, double ng, int *o1, int *o2, int align_flag)
-/* Generate optimal local (Smit & Waterman 1981) alignment path using affine gap penalties
+/* Generate optimal local (Smith & Waterman 1981) alignment path using affine gap penalties
  * including an unpublished crossover gap allowance (Gippert 2001). Return alignment score
  * and (indirectly) sequence offsets. */
 {
@@ -1035,13 +1044,6 @@ void aln_write_text(ALN *A)
 	fflush(alnfp);
 }
 
-void aln_write_binary(ALN *A)
-/* stub for writing aln binary */
-/* stub for writing aln binary, requires that blnfp is initially NULL */
-{
-	return;
-}
-
 #define MAXSCOREDIST 9999.9
 double compute_scoredistance(double ma, double mr, double m1, double m2, double scale)
 /* unpublished Gippert, G.P, ca 2009, sequence-length normalization of ScoreDist from Sonnhammer & Hollich 2005 */
@@ -1275,7 +1277,7 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 int p_strict = 0;		/* set to 1, and no deviation is allowed in the recomputation of alignment score */
 
 void align_stats(ALN *A, int expected_plen, double expected_ascore)
-/* compute ALN statistics */
+/* compute (missing) ALN statistics */
 {
 	if (A->aln1 == NULL) fprintf(stderr, "align_stats A->aln1 == NULL\n"), exit(1);
 	if (A->aln2 == NULL) fprintf(stderr, "align_stats A->aln2 == NULL\n"), exit(1);
@@ -1362,6 +1364,7 @@ void align_stats(ALN *A, int expected_plen, double expected_ascore)
 	A->ascore = A->mscore - A->gapcost;
 
 	/* compute score distances */
+
 	/* original score distance of Sonnhammer & Hollich normalized to alignment length */
 	double scale = (double)(A->alen) / (double)(A->mlen);
 	A->sd0 = compute_scoredistance(A->mscore, A->mscorer, A->mscore1, A->mscore2, scale);
@@ -1386,103 +1389,70 @@ void align_stats(ALN *A, int expected_plen, double expected_ascore)
 		if (1 || p_strict)
 			exit(1);
 	}
-
-	/* TODO: reintroduce the ALN data structure which contains the entire pairwise alignment
-		then call to write it to JSON
-		and call to write it to TALN (text alignment)
-		and call to write it to BALN (binary alignment)
-
-	   It might be better to decouple (again) alignment generation from tree generation.
-		for example after writing the binary aligment to read it again as a way
-		of determining the distance matrix, rather than populating the distance matrix
-		one alignment at a time.
-
-	   This would need to be tied into reading a distance matrix.
-
-	   This would also need to be reconciled with reading a multiple alignment. Does it really make sense
-	   to save the multiple alignment as an entire set of pairwise alignments? Spacewise not.
-
-	   Eventually we could skip the text output, as it is a legacy format not part of any current workflow.
-	   However, in case people have ever seen this code and use it, maybe the ascii part could be kept.
-
-	   GarryG March 17, 2025
-	*/
 }
 
 ALN *pair_malign(int fi, int fj)
-/* return inferred alignment of fasta elements fi, fj */
+	/* return interpolated pairwise alignment (from input multiple alignment) of fasta entries fi vs fj */
 {
-	/* pre-aligned fasta sequences */
 	char *a1 = fseq[fi], *a2 = fseq[fj];
 	ALN *A = aln_obj(facc[fi], facc[fj], NULL, NULL, fseq[fi], fseq[fj]);
 	align_stats(A, -1, -1.0);
-
 	return(A);
 }
 
 ALN *pair_align(int fi, int fj)
-/* return local alignment of  fasta elements fi, fj */
+	/* return computed pairwise alignment (using Smith-Waterman 1981) of fasta entries fi vs fj */
 {
 	int align_flag = ALIGN_GAP | ALIGN_PAD | ALIGN_CROSS;
 	char *s1 = fseq[fi], *s2 = fseq[fj];
 	int o1, o2, n1 = strlen(s1), n2 = strlen(s2);
-
-	pair_score_matrix(fi, fj);	/* allocate global score and match matrix */
+	pair_score_matrix(fi, fj);
 	double **sx = global_score_matrix, **mx = global_match_matrix;
-
-	/* compute optimal alignment and alignment score */
 	double ascore = align_score(s1, s2, n1, n2, sx, mx, p_go, p_ge, &o1, &o2, align_flag);
 	ALN *A = align_ali(s1, s2, n1, n2, o1, o2, sx, mx, align_flag);
 	A->name1 = char_string(facc[fi]);
 	A->name2 = char_string(facc[fj]);
-
 	return(A);
 }
 
 double **global_dmx = NULL;
 double **global_imx = NULL;
 
-double **align_fasta()
-/* return all-vs-all pairwise distance matrix from multiple alignment or computed pairwise alignments
-// return a symmetric matrix containing align scoredistance normalized
-// to the shortest sequence length of the pair */
+void align_fasta()
+	/* compute or interpolate all pairwise alignments
+	 * optionally write alignment(s) out in different flagged formats,
+	 * AND populate global distance matrix and global percent identity matrix */
 {
 	int i, inext, j;
-	global_dmx = double_matrix(g_nent, g_nent);	/* distance matrix */
-	global_imx = double_matrix(g_nent, g_nent);	/* identity matrix */
+	if (global_dmx)
+		fprintf(stderr, "align_fasta: global_dmx is already allocated\n"), exit(1);
+	if (global_imx)
+		fprintf(stderr, "align_fasta: global_imx is already allocated\n"), exit(1);
+	global_dmx = double_matrix(g_nent, g_nent);
+	global_imx = double_matrix(g_nent, g_nent);
 	ALN *A;
 	for (i = 0; i < g_nent; i++) {
 		for (j = (p_nonself ? i + 1 : i); j < g_nent; j++) {
 			A =  (p_maln ? pair_malign(i, j) : pair_align(i, j));
-
-			/* write alignments */
-			if (p_baln)
-				aln_write_binary(A);
 			if (p_jaln)
 				aln_write_json(A);
 			if (p_taln)
 				aln_write_text(A);
-
-			/* populate distance matrix with minlen score distance */
 			global_dmx[i][j] = global_dmx[j][i] = A->sd;
 			global_imx[i][j] = global_imx[j][i] = 100.0 * (double)(A->ilen)/(double)(A->mlen);
-
 			aln_free(A);
 		}
 	}
-	return (global_dmx);
 }
 
 /* EMBED */
 
 int p_dim = 20;			/* embed dimension: default 20 */
-char p_e = 'F';			/* 'D' = distance only, 'S' = single only, 'F' = full recursive embed */
 int p_ilim = 1000;		/* embed iteration limit: default 1000 */
 double p_clim = 1.0e-12;	/* embed polynomial convergence limit, default 1e-12 */
 
 double eigvec(int n, double **mx, double *v, double *t)
-/* Determine most significant eigenvector of matrix m by successive approximation
-// (Crippen & Havel) */
+/* Determine most significant eigenvector of matrix m by successive approximation (Crippen & Havel) */
 {
 	int i, j, count = 0;
 	double norm;
@@ -1492,58 +1462,41 @@ double eigvec(int n, double **mx, double *v, double *t)
 
 	do {
 		prev = value;
-
 		/* rotate trial vector by metric matrix */
-
 		for (i = 0; i < n; i++) {
 			v[i] = 0.0;
 			for (j = 0; j < n; j++)
 				v[i] += mx[i][j] * t[j];
 		}
-
 		/* compute dot product */
-
 		value = 0.0;
 		for (i = 0; i < n; i++)
 			value += v[i] * t[i];
-
 		/* check unity condition */
-
 		if (value == 0.0)
 			break;
-
 		ratio = fabs((value - prev) / value);
-
 		if (p_v)
 			printf("# EIGVAL iter(%d) prev(%e) value(%e) conv(%e)\n", count, prev, value, ratio);
-
 		/* normalize */
-
 		norm = 0.0;
 		for (i = 0; i < n; i++)
 			norm += v[i] * v[i];
 		norm = sqrt(norm);
-
 		for (i = 0; i < n; i++)
 			t[i] = v[i] / norm;
-
 		count++;
-
 	} while (count < p_ilim && ratio > p_clim);
-
 	for (i = 0; i < n; i++)
 		v[i] = t[i];
-
 #ifdef DEBUG
 	printf("# %12.4f eigenvalue found %3d / %3d iter., %g / %g conv.\n", value, count, p_ilim, ratio, p_clim);
 #endif
-
 	return (value);
 }
 
 void matrix_deflate(int n, double **mx, double *v, double e)
-/* eliminate eigenspace of last eigenvalue from matrix, which reduces
- * its rank by one (from Crippen & Havel 1988) */
+/* eliminate eigenspace of last eigenvalue from matrix, reducing its rank by one (Crippen & Havel 1988) */
 {
 	int i, j;
 	for (i = 0; i < n; i++) {
@@ -1619,7 +1572,6 @@ double **embed_dmx(int n, double **d)
 	double_matrix_free(n, n, mx);
 	double_vector_free(p_dim, e);
 	double_vector_free(n, t);
-	/* return coordinates */
 	coord = double_matrix(n, p_dim);
 	for (i = 0; i < n; i++)
 		for (j = 0; j < p_dim; j++)
@@ -2127,7 +2079,7 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 		/* update distances to node m from remaining available nodes  */
         	double dis, sd_dis;
 		if (dmx_flag & DMX_ONE) {
-			/* Average distance model */
+			/* Average branch length */
 			for (i = 0; i < m; i++) {
 				if (avail[i]) {
 					dis = (smx[i][mini] + smx[i][minj]) / 2.0;
@@ -2137,8 +2089,7 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 		}
 		else
 		if (dmx_flag & DMX_TWO) {
-			/* Average leaf-to-leaf distance between members of new node m,
-			 * and each remaining available node i */
+			/* Average leaf-to-leaf distance */
 			nl = 0;
         		bnode_indexi(P, lindex, &nl);
 			for (i = 0; i < m; i++) {
@@ -2563,17 +2514,7 @@ void write_tree(BNODE * P, char *filename)
 	fclose(fp);
 }
 
-void write_tree_binary(BNODE * P, char *filename)
-{
-	fprintf(stderr, "write_tree_binary stub bnode %d, filename %s\n", bnode_length(P), filename);
-	return ;
-
-	printf("You are attempting to write_tree_binary to %s, unsuccessfully! treelength %d\n", filename, bnode_count(P));
-	fprintf(stderr, "You are attempting to write_tree_binary %s, unsuccessfully! treelength %d\n", filename, bnode_count(P));
-	exit(1);
-}
-
-void write_dmx(double **dmx, char *oprefix)
+void write_dmx(char *oprefix)
 /* print distance upper half matrix plus diagonal */
 {
 	char *filename = char_vector(strlen(oprefix) + strlen(".dmx.txt") + 1);
@@ -2584,7 +2525,7 @@ void write_dmx(double **dmx, char *oprefix)
 		fprintf(stderr, "Distance file %s cannot be opened for writing\n", filename), exit(1);
 	for (c = 0, i = 0; i < g_nent; i++)
 		for (j = i; j < g_nent; j++, c++)
-			fprintf(fp, "%s %s %f\n", facc[i], facc[j], dmx[i][j]);
+			fprintf(fp, "%s %s %f\n", facc[i], facc[j], global_dmx[i][j]);
 	fclose(fp);
 	fprintf(stderr, "Wrote dmx %s %d elements, expect N(N+1)/2 %d for N=%d\n",
 		filename, c, g_nent*(g_nent+1)/2, g_nent);
@@ -2595,7 +2536,7 @@ BNODE *bnode_distance_tree(int n, double **dmx)
 {
 	int *index = int_vector_ramp(n);
 	int dmx_flag = DMX_ONE;
-	if (p_cross)
+	if (p_dave)
 		dmx_flag = DMX_TWO;
 	BNODE *P = bnode_tree_dmx(n, index, dmx, dmx_flag);
 	return(P);
@@ -2619,25 +2560,26 @@ BNODE *bnode_embed_tree(int n, double **dmx)
 }
 
 #define COMMAND_LINE_HELP "\n\n\
-ACLUST  Generates pairwise alignments, distance matrix and phylogenetic tree from protein FASTA input files.\n\
+ACLUST computes or interpolates pairwise sequence alignments from protein FASTA input, and\n\
+generates a sequence clustering tree based on nearest-neighbor joining of distances.\n\
 Input entries may be pre-aligned, for example Fasta format output produced by MAFFT, or unaligned.\n\
 \n\
 Required:\n\
 	-s <path>		filepath and name of substitution score matrix (e.g., '../dat/BLOSUM62.txt')\n\
 Optional:\n\
 	-p <string>		prefix for all output files (default=name of first input fasta file)\n\
-	-e <char>		(D) distance tree only, (S) distance+single embed trees, (F, default) distance+single+full embed trees\n\
-	-d <integer>		embed dimension (default 20)\n\
 	-dmxfile <my.dmx>	Skips alignment phase and reads directly distance matrix in labelI labelJ DIJ\n\
 	-go <float>		Gap open penalty\n\
 	-ge <float>		Gap extend penalty\n\
+	-d <integer>		embed dimension (default 20)\n\
+	-e <char>		(D) distance tree only, (S) distance+single embed trees, (F, default) distance+single+full embed trees\n\
 Switches:\n\
-	-c			switch OFF average distances from leaf nodes\n\
-	-maln 			read multiple alignment fasta\n\
+	-maln 			switch ON read multiple alignment fasta\n\
+	-dave			switch OFF average distances from leaf nodes\n\
+	-alignf 		switch ON read from ALIGNFASTAS output instead of FASTA\n\
 	-metadata 		switch OFF write node metadata in tree file\n\
 	-jaln			switch OFF write alignment as JSON file\n\
 	-taln			switch ON write alignment as text file\n\
-	-baln			switch ON write alignment as binary file (not currently supported)\n\
 	-nonself		deactivates self alignments\n\
 	-v			activates more verbose output\n\
 \n\
@@ -2696,6 +2638,12 @@ int pparse(int argc, char *argv[])
 			oprefix = char_string(argv[c++]);
 			fprintf(stderr, "output prefix set to '%s'\n", oprefix);
 		}
+		/* D */
+		else if (strncmp(argv[c], "-dave", 5) == 0) {
+			++c;
+			p_dave = (p_dave + 1) % 2;
+			fprintf(stderr, "distance averaging flag set to %d\n", p_dave);
+		}
 		else if (strncmp(argv[c], "-d", 2) == 0) {
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
@@ -2742,10 +2690,10 @@ int pparse(int argc, char *argv[])
 			c++;
 		}
 		/* switch ON <-> OFF */
-		else if (strncmp(argv[c], "-c", 2) == 0) {
+		else if (strncmp(argv[c], "-alignf", 7) == 0) {
 			++c;
-			p_cross = (p_cross + 1) % 2;
-			fprintf(stderr, "cross flag set to %d\n", p_cross);
+			p_alignf = (p_alignf + 1) % 2;
+			fprintf(stderr, "alignf flag set to %d\n", p_alignf);
 		}
 		else if (strncmp(argv[c], "-nonself", 8) == 0) {
 			++c;
@@ -2761,11 +2709,6 @@ int pparse(int argc, char *argv[])
 			++c;
 			p_maln = (p_maln + 1)%2;
 			fprintf(stderr, "Read multiple alignment %d\n", p_maln);
-		}
-		else if (strncmp(argv[c], "-baln", 5) == 0) {
-			++c;
-			p_baln = (p_baln + 1)%2;
-			fprintf(stderr, "Write align binary %d\n", p_baln);
 		}
 		else if (strncmp(argv[c], "-jaln", 5) == 0) {
 			++c;
@@ -2801,23 +2744,22 @@ int pparse(int argc, char *argv[])
 	}
 	
 	fprintf(stderr, "Command line parameter summary:\n");
-	fprintf(stderr, " f_dmxfilename '%s'\n", f_dmxfilename);
-	fprintf(stderr, " scorematrix file '%s'\n", scorematrixfile);
-	fprintf(stderr, " output prefix '%s'\n", oprefix);
-	fprintf(stderr, " dimension %d\n", p_dim);
-	fprintf(stderr, " Embed %c\n", p_e);
-	fprintf(stderr, " Gap open %g\n", p_go);
-	fprintf(stderr, " Gap extension %g\n", p_ge);
-	fprintf(stderr, " Gap max crossover length %d\n", p_gx);
-	fprintf(stderr, " cross flag %d\n", p_cross);
-	fprintf(stderr, " nonself flag %d\n", p_nonself);
-	fprintf(stderr, " metadata flag %d\n", p_metadata);
-	fprintf(stderr, " multiple alignment flag %d\n", p_maln);
+	fprintf(stderr, " multiple alignment input flag %d\n", p_maln);
+	fprintf(stderr, " distance averaging flag %d\n", p_dave);
+	fprintf(stderr, " distance matrix input filename '%s'\n", f_dmxfilename);
+	fprintf(stderr, " substitution score matrix file '%s'\n", scorematrixfile);
+	fprintf(stderr, " output file prefix '%s'\n", oprefix);
+	fprintf(stderr, " align nonself flag %d\n", p_nonself);
+	fprintf(stderr, " affine gap open penalty %g\n", p_go);
+	fprintf(stderr, " affine gap extension penalty %g\n", p_ge);
+	fprintf(stderr, " affine gap crossover maxlength %d\n", p_gx);
 	fprintf(stderr, " write json alignments %d\n", p_jaln);
 	fprintf(stderr, " write text alignments %d\n", p_taln);
-	fprintf(stderr, " write binary alignments %d\n", p_baln);
-	fprintf(stderr, " verbose flag %d\n", p_v);
-	fprintf(stderr, " help flag %d\n", p_h);
+	fprintf(stderr, " tree metadata flag %d\n", p_metadata);
+	fprintf(stderr, " tree type %c\n", p_e);
+	fprintf(stderr, " tree embed dimension %d\n", p_dim);
+	fprintf(stderr, " aclust verbose flag %d\n", p_v);
+	fprintf(stderr, " aclust help flag %d\n", p_h);
 	if (p_h)
 		command_line_help(c, argc, argv);
 
@@ -2847,23 +2789,96 @@ void explain_input_better(int argc, char *argv[], int cstart)
 		fprintf(stderr, "Input file(s) needed, expecting Fasta filenames\n"), exit(1);
 }
 
-/* usage
-	double **dmx = read_dmx(f_dmxfilename);
-*/
-
 int facc_index(char *word)
 {
 	int i; for (i = 0; i < g_nent; i++) if (strcmp(facc[i], word)==0) return i;
 	return -1;
 }
 
-double **read_dmx(char *filename)
+/* remember MAXENTRIES 10000 int g_nent = 0; char *facc[MAXENTRIES]; */
+
+void read_alignf(int argc, char *argv[], int cstart)
+	/* Read a bunch of alignfastas output files */
 {
-/* remember MAXENTRIES 10000
-	int g_nent = 0;
-	char *facc[MAXENTRIES];
-*/
+	fprintf(stderr, "%s Trying to read alignfasta file(s) start %d of %d\n", argv[0], cstart, argc);
+	g_nsrc = g_nent = 0;
+	char line[MAXLINELEN], word1[MAXWORDLEN], word2[MAXWORDLEN];
+	double alnid, sdmin;
+	FILE *fp;
+	int c, index1, index2;
+	global_dmx = global_imx = NULL;
+	for (c = cstart; c < argc; c++) {
+		fprintf(stderr, " argv[%d], %s\n", c, argv[c]);
+		if ((fp = fopen(argv[c], "r")) == NULL)
+			fprintf(stderr, "Could not open filename %s r mode\n", argv[c]), exit(1);
+		while (fgets(line, sizeof(line), fp) != NULL) {
+			if (strlen(line) == 0 || line[0] == '#')
+				continue;
+			/*
+			 * >>00x00 cazy19791-Pyrobaculum_aerophilum-GT66    785 cazy19791-Pyrobaculum_aerophilum-GT66    785    785    785    785    785      0      0    785    785 1        4079   4079 1092.29 1092.29 1575.84 1575.84 86.8018     15   4079   4079   -785     -0     -0     -0     -0
+			 */
+
+			if (sscanf(line, "%*s %s %*d %s %*d %*d %*d %*d %*d %*d %*d %*d %*d %lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %lf",
+				word1, word2, &alnid, &sdmin) != 4)
+				fprintf(stderr, "Could not sscanf word1, word2, alnid, sdmin from line >>%s<<\n", line), exit(1);
+			/* return or assign accession indices */
+			while((index1 = facc_index(word1)) < 0)
+				facc[g_nent++] = char_string(word1);
+			while((index2 = facc_index(word2)) < 0)
+				facc[g_nent++] = char_string(word2);
+			if (p_v)
+			fprintf(stderr, "first g_nent %d word1 %s index %d word2 %s index %d alnid %g sdmin %g\n",
+				g_nent, word1, facc_index(word1), word2, facc_index(word2), alnid, sdmin);
+		}
+		fclose(fp);
+		g_nsrc++;
+	}
+	fprintf(stderr, "Defined %d entries in %d sources\n", g_nent, g_nsrc);
+
+	/* allocate global distance and percent identity matrices */
+	global_dmx = double_matrix(g_nent, g_nent);
+	global_imx = double_matrix(g_nent, g_nent);
+	int i, j;
+	for (i = 0; i < g_nent; i++)
+		for (j = i;  j < g_nent; j++)
+			global_dmx[i][j] = global_dmx[j][i] = global_imx[i][j] = global_imx[j][i] = -99.0;
+
+	/* Reopen the file and rescan the data. Simply faster than recording it the first time */
+	for (c = cstart; c < argc; c++) {
+		fprintf(stderr, " argv[%d], %s\n", c, argv[c]);
+		if ((fp = fopen(argv[c], "r")) == NULL)
+			fprintf(stderr, "Could not open filename %s r mode\n", argv[c]), exit(1);
+		while (fgets(line, sizeof(line), fp) != NULL) {
+			if (strlen(line) == 0 || line[0] == '#')
+				continue;
+			if (sscanf(line, "%*s %s %*d %s %*d %*d %*d %*d %*d %*d %*d %*d %*d %lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %lf",
+				word1, word2, &alnid, &sdmin) != 4)
+				fprintf(stderr, "Could not sscanf word1, word2, alnid, sdmin from line >>%s<<\n", line), exit(1);
+			/* retrieve accession indices */
+			if((index1 = facc_index(word1)) < 0)
+				fprintf(stderr, "Unexpected that word >>%s<< is not on facc list g_nent %d\n", word1, g_nent), exit(1);
+			if((index2 = facc_index(word2)) < 0)
+				fprintf(stderr, "Unexpected that word >>%s<< is not on facc list g_nent %d\n", word2, g_nent), exit(1);
+			if (p_v)
+			fprintf(stderr, "second g_nent %d word1 %s index %d word2 %s index %d alnid %g sdmin %g\n",
+				g_nent, word1, facc_index(word1), word2, facc_index(word2), alnid, sdmin);
+			global_imx[index1][index2] = global_imx[index2][index1] = 100.0 * alnid;
+			global_dmx[index1][index2] = global_dmx[index2][index1] = sdmin;
+		}
+		fclose(fp);
+	}
+	fprintf(stderr, "Read %d indices from %d source files\n", g_nent, g_nsrc);
+}
+
+void read_dmx(char *filename)
+	/* read distance matrix from a file.
+	 * This involves parsing the file twice,
+	 * 	first to review the number of unique labels
+	 * 	second to allocate and fill in the distance matrix
+	 */
+{
 	g_nent = 0;
+	fprintf(stderr, "%s Read Distance matrix from file %s\n", filename);
 	char line[MAXLINELEN], word1[MAXWORDLEN], word2[MAXWORDLEN];
 	float value;
 	int index1, index2;
@@ -2883,8 +2898,9 @@ double **read_dmx(char *filename)
 	}
 	fclose(fp);
 
-	/* that was a very fast way to allocate the labels and dimension the space */
+	/* allocate global distance and percent identity matrices */
 	global_dmx = double_matrix(g_nent, g_nent);
+	global_imx = NULL; /* TODO add additional arguments to enable read of pct id matrix */
 	int i, j;
 	for (i = 0; i < g_nent; i++)
 		for (j = i;  j < g_nent; j++)
@@ -2909,7 +2925,6 @@ double **read_dmx(char *filename)
 		global_dmx[index1][index2] = global_dmx[index2][index1] = value;
 	}
 	fclose(fp);
-	return (global_dmx);
 }
 
 int main(int argc, char *argv[])
@@ -2917,86 +2932,81 @@ int main(int argc, char *argv[])
 	float stime = elapsed(0.0);
 	int ctime = clocktime(0);
 	int c = pparse(argc, argv);
-	if (!oprefix) {
+	if (!oprefix)
 		oprefix = char_string("this");
-		fprintf(stderr, "oprefix initialized to %s\n", oprefix);
-	}
 	if (c == 1)
 		explain_input_better(argc, argv, c);
 	if (!oprefix)
 		oprefix = char_string(argv[c]);
+
 	fprintf(stderr, "oprefix set to %s\n", oprefix);
 
 	double **dmx = NULL;
 
-	if (!f_dmxfilename) {
-		/* usual business of generating dmx */
-		/* Read scorematrix before Fasta  - why ? maybe it was to initialize index lookup ? */
+	if (f_dmxfilename != NULL) {
+		/* read dmx from a file */
+		read_dmx(f_dmxfilename);
+	}
+	else if (p_alignf) {
+		/* read dmx from alignfasta file(s) */
+		read_alignf(argc, argv, c);
+		write_dmx(oprefix);
+	}
+	else {
+		/* compute dmx from computed or interpolated pairwise alignments */
 		if (!scorematrixfile)
 			scorematrixfile = char_string(DEFAULT_SCORE_MATRIX);
 		read_scorematrix(scorematrixfile);
 		read_fasta_files(argc, argv, c);
-		/* perform heavy lifting all pairs alignment, returning double **dmx */
-		dmx = align_fasta();
-		write_dmx(dmx, oprefix);
-		fprintf(stderr, "Proceeding with distance matrix dimension %d created by alignment\n", g_nent);
-	} else {
-		/* read_dmx returns double ** but also sets g_nent and point labels facc */
-		dmx = read_dmx(f_dmxfilename);
-		fprintf(stderr, "Got DMX with %d entries, scanning for possible holes...\n", g_nent);
-		int i, j, neg = 0;
-		for (i = 0; i < g_nent; i++)
-			for (j = 0; j < g_nent; j++)
-				if ( dmx[i][j] < -0.0 ) {
-					fprintf(stderr, "Negative i, j %d %d v %g\n", i, j, dmx[i][j]);
-					neg++;
-				}
-		if (neg > 0)
-			fprintf(stderr, "Cannot proceed without a complete distance matrix\n"), exit(1);
-		fprintf(stderr, "Proceeding with distance matrix dimension %d read from file >>%s<<\n", g_nent, f_dmxfilename);
+		align_fasta();
+		write_dmx(oprefix);
 	}
+	/* test the distance matrix for 'holes' */
+	fprintf(stderr, "Got DMX with %d entries, scanning for possible holes...\n", g_nent);
+	int i, j, neg = 0;
+	for (i = 0; i < g_nent; i++) {
+		for (j = 0; j < g_nent; j++) {
+			if ( global_dmx[i][j] < -0.0 ) {
+				fprintf(stderr, "Negative i, j %d %d v %g\n", i, j, dmx[i][j]);
+				neg++;
+			}
+		}
+	}
+	if (neg > 0)
+		fprintf(stderr, "Negative distances (holes) found in matrix\n"), exit(1);
+	fprintf(stderr, "Distance matrix complete\n");
 
-	/* Construct tree based on distance matrix alone.  */
-	BNODE *dree = bnode_distance_tree(g_nent, dmx);
+	/* Construct tree based on distance matrix alone. */
+	BNODE *dree = bnode_distance_tree(g_nent, global_dmx);
 	char *treefile = char_vector(strlen(oprefix) + strlen(".dree.txt") + 1);
 	sprintf(treefile, "%s%s", oprefix, ".dree.txt");
-	fprintf(stderr, "Distance tree %s\n", treefile);
 	write_tree(dree, treefile);
-	free(treefile);
-	fprintf(stderr, "Aclust after Distance tree %.3f elapsed CPU seconds, %d clock seconds\n",
-		elapsed(stime), clocktime(ctime));
+	fprintf(stderr, "Distance tree written to %s %.3f elapsed CPU seconds, %d clock seconds\n",
+			treefile, elapsed(stime), clocktime(ctime));
 	if (p_e == 'D')
 		fprintf(stderr, "Halt after distance tree\n"), exit(0);
+	free(treefile);
 
-	/* Construct tree based on single pass embedding.
-	*/
-	BNODE *tree = bnode_embed_tree(g_nent, dmx);
+	/* Continue with tree based on single pass embedding. */
+	BNODE *tree = bnode_embed_tree(g_nent, global_dmx);
 	treefile = char_vector(strlen(oprefix) + strlen(".tree0.txt") + 1);
 	sprintf(treefile, "%s%s", oprefix, ".tree0.txt");
-	fprintf(stderr, "Single embed tree %s\n", treefile);
 	write_tree(tree, treefile);
-	free(treefile);
-	fprintf(stderr, "Aclust after Single embed tree %.3f elapsed CPU seconds, %d clock seconds\n",
-		elapsed(stime), clocktime(ctime));
+	fprintf(stderr, "Single-embed tree written to %s %.3f elapsed CPU seconds, %d clock seconds\n",
+			treefile, elapsed(stime), clocktime(ctime));
 	if (p_e == 'S')
 		fprintf(stderr, "Halt after single embed tree\n"), exit(0);
+	free(treefile);
 
-	/* Continue with full recursive embedding.
-	*/
-	tree->left = bnode_reembed(tree->left, 'L', dmx, g_nent, p_dim);
-	tree->right = bnode_reembed(tree->right, 'R', dmx, g_nent, p_dim);
+	/* Continue with tree based on full recursive embedding. */
+	tree->left = bnode_reembed(tree->left, 'L', global_dmx, g_nent, p_dim);
+	tree->right = bnode_reembed(tree->right, 'R', global_dmx, g_nent, p_dim);
 	treefile = char_vector(strlen(oprefix) + strlen(".tree.txt") + 1);
 	sprintf(treefile, "%s%s", oprefix, ".tree.txt");
-	fprintf(stderr, "Full recursive embed tree %s\n", treefile);
 	write_tree(tree, treefile);
+	fprintf(stderr, "Full-recursive-embed tree written to %s %.3f elapsed CPU seconds, %d clock seconds\n",
+			treefile, elapsed(stime), clocktime(ctime));
 	free(treefile);
-	fprintf(stderr, "Aclust after Full recursive embed tree %.3f elapsed CPU seconds, %d clock seconds\n",
-		elapsed(stime), clocktime(ctime));
-
-	char *binary_treefile = char_string("binary_treefile.btf");
-	write_tree_binary(tree, binary_treefile);
-	fprintf(stderr, "Aclust complete %.3f elapsed CPU seconds, %d clock seconds\n",
-		elapsed(stime), clocktime(ctime));
 
 	exit(0);
 }
