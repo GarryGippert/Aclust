@@ -1,7 +1,11 @@
 # Program: Aclust
 (Alignment and clustering of protein sequences)
 
-Contents: A C-language program **aclust.c** that generates phylogenetic trees from Fasta protein sequence input.
+ACLUST is a C-language program that generates a clustered sequence tree from protein Fasta input.
+
+The tree is based on a NNJ (Nearest Neighbor Joining) algorithm using the distance of all-vs-all pairwise sequence distances.
+
+Distances are either computed from doing pairwise local sequence alignment using a Smith-Waterman (1988) algorithm **OR** are interpolated from a user-supplied multiple alignment.
 
 Garry Paul Gippert, Bioengineering, Danish Technical University, Lyngby, Denmark. MANUSCRIPT IN PREPARATION
 
