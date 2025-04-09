@@ -1,34 +1,29 @@
 /* ACLUST
 
-Aclust reads one or more Fasta files, computes or interpolates sequence
-pairwise alignments, and builds a nearest-neighbor joining (NNJ) tree
-from the matrix of pairwise distances.
+Aclust reads one or more Fasta files, computes or interpolates sequence pairwise alignments, and
+builds a nearest-neighbor joining (NNJ) tree from the matrix of pairwise distances.
 
 
 Sequence alignments:
 
-Supply a multiple alignment by using the -maln command line flag,
-otherwise local sequence pairwise alignments are computed using a modified
-local alignment (Smith & Waterman, 1981) with affine gap penalties. The
-(unpublished) modification allows a gap crossover (gap that starts in one
-sequence and ends in the other). A gap crossover allowance may slightly
-improve some alignments, but incurs additional algorithmic cost. By default
-the BLOSUM62 amino-acid substitution score matrix is used.
+Supply a multiple alignment by using the -maln command line flag, otherwise local sequence pairwise
+alignments are computed using a modified local alignment (Smith & Waterman, 1981) with affine gap
+penalties. The (unpublished) modification allows a gap crossover (gap that starts in one sequence
+and ends in the other). A gap crossover allowance may slightly improve some alignments, but incurs
+additional algorithmic cost. By default the BLOSUM62 amino-acid substitution score matrix is used.
 
 	output file: prefix.aln.js and/or prefix.aln.txt
 
-The user may skip computing or interpolating alignments by either
-supplying a distance matrix using the -dmxfile parameter, or reading
-ALIGNFASTAS files (local convention) using the -alignf flag.
+The user may skip computing or interpolating alignments by either supplying a distance matrix using
+the -dmxfile parameter, or reading ALIGNFASTAS files (local convention) using the -alignf flag.
 
 Distance matrix:
 
-Distances are computed based on a modified ScoreDist (Sonnhammer &
-Hollich 2005). The (unpublished) modification normalizes the expectation
-score (denominator of ScoreDist) to sequence length instead of alignment
-length. By convention the shorter of the two sequences in a given pairwise
-alignment is used. Sequence length normalization has the effect of pushing
-apart sequences that only align along a short matching segment.
+Distances are computed based on a modified ScoreDist (Sonnhammer & Hollich 2005). The (unpublished)
+modification normalizes the expectation score (denominator of ScoreDist) to sequence length instead
+of alignment length. By convention the shorter of the two sequences in a given pairwise alignment is
+used. Sequence length normalization has the effect of pushing apart sequences that only align along
+a short matching segment.
 
 	output file: prefix.dmx.txt
 
@@ -36,54 +31,47 @@ Tree building:
 
 Command line parameter -e D
 
-A Nearest Neighbor Joining (NNJ) tree is computed from the Distance matrix.
-At each iteration two 'closest' nodes are combined into a single new node.
-Distances from the new node to all remaining nodes are computed using branch
-length averaging or leaf-distance averaging. (TODO - add text describing
-which command line flag applies.)
+A Nearest Neighbor Joining (NNJ) tree is computed from the Distance matrix.  At each iteration two
+'closest' nodes are combined into a single new node.  Distances from the new node to all remaining
+nodes are computed using branch length averaging or leaf-distance averaging. (TODO - add text
+describing which command line flag applies.)
 
 	output file: prefix.dree.txt
 
 Command line paramter -e S
 
-A second tree may be computed from a Single iteration of the distance geometry
-EMBED algorithm (Crippen & Havel, 1988) applied to the distance matrix. By
-default the first 20 most significant eigenvectors are found. Thereafter a tree
-is constructed by NNJ in the space of orthogonal coordinates (scaled eigenvectors)
-with new node positions computed usign direct coordinate averaging.
+A second tree may be computed from a Single iteration of the distance geometry EMBED algorithm
+(Crippen & Havel, 1988) applied to the distance matrix. By default the first 20 most significant
+eigenvectors are found. Thereafter a tree is constructed by NNJ in the space of orthogonal
+coordinates (scaled eigenvectors) with new node positions computed usign direct coordinate
+averaging.
 
 	output file: prefix.tree0.txt
 
 Command line parameter -e F
 
-A third tree may be computed from a Full recursive application of EMBED and NNJ 
-for each subtree of the first EMBED tree. This may be computationally expensive
-but may produce nice trees in some situations.
+A third tree may be computed from a Full recursive application of EMBED and NNJ for each subtree of
+the first EMBED tree. This may be computationally expensive but may produce nice trees in some
+situations.
 
 	output file: prefix.tree.txt
 
-Please contact the author Garry Paul Gippert, GarryG@dtu.dk, DTU Bioengineering,
-Danish Technical University, with questions or for more information.
+Please contact the author Garry Paul Gippert, GarryG@dtu.dk, DTU Bioengineering, Danish Technical
+University, with questions or for more information.
 
 ACLUST was developed and written by Garry Paul Gippert, and packaged as a single C source file in 2023.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES 
-OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT 
-HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
-DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES
+OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ACLUST is made available online at GitHub GarryGippert:Aclust
-(https://github.com/GarryGippert/Aclust) with a GNU General Public
-License v3.0, and may be used, modified and distributed according
-to the principles therein, as long as the above license text from
-Novozymes is adhered to, and is preserved and distributed within all
-copies of this code and derivative works. Signed,
-Garry Paul Gippert Nov 23, 2023
-*/
+(https://github.com/GarryGippert/Aclust) with a GNU General Public License v3.0, and may be used,
+modified and distributed according to the principles therein, as long as the above license text from
+Novozymes is adhered to, and is preserved and distributed within all copies of this code and
+derivative works. Signed, Garry Paul Gippert Nov 23, 2023 */
 
 /* Supplementary material
 
@@ -94,7 +82,7 @@ intervening match state.
 CROSS-OVER GAP:
 
 In the following, O is the gap opening penalty, and e is the gap extension penalty. In the present
-work, O = 12, e = 1. The crossover allowance reduces the gap penalty by 
+work, O = 12, e = 1. The crossover allowance reduces the gap penalty by
 	(2 * O + 4 * e)   -   (O + 5 * e)    =    O - e
 compared to twice opening a gap. (Fictitious example for illustration.)
 
@@ -106,23 +94,23 @@ compared to twice opening a gap. (Fictitious example for illustration.)
 Re-embedding of isolated sub-branches has the effect of gradually reducing deleterious effects of
 long-range, inaccurate distances.  Probably both the choice of distance function, and algorithmic
 choices such as only taking 20 eigenvalues/vectors, contribute to distortions of local topology when
-including long-range distances.  CAVEAT: Nodes have been observed to be 'trapped' in the wrong initial
-branch, for example when comparing full-length sequences and sequence fragments.
+including long-range distances.  CAVEAT: Nodes have been observed to be 'trapped' in the wrong
+initial branch, for example when comparing full-length sequences and sequence fragments.
 
 PADDED AND GAPPED ALIGNMENTS:
 
-The GAP symbol '-' is used to indicate non-matched positions within the local alignment. The PAD symbol
-'+' is used to indicate regions of sequence that fall outside the local alignment, and allows the full
-input sequences to be reproduced from the output alignment string.
+The GAP symbol '-' is used to indicate non-matched positions within the local alignment. The PAD
+symbol '+' is used to indicate regions of sequence that fall outside the local alignment, and allows
+the full input sequences to be reproduced from the output alignment string.
 
 	>aln1
 	ACGHIKNPQRVWY
 	>aln2
 	DEFGHIKLMNPQRST
 
-For example if we align the two sequences above, we get the folling local alignment having 10 aligned
-positions (starting with G, ending with R), 8 matched positions including a gap of length 2, and a
-total pad length of 20 which accounts for subsequences found outside the local alignment.
+For example if we align the two sequences above, we get the folling local alignment having 10
+aligned positions (starting with G, ending with R), 8 matched positions including a gap of length 2,
+and a total pad length of 20 which accounts for subsequences found outside the local alignment.
 
 	Pair aln1 13 x aln2 15
 	AC+++GHIK--NPQRVWY++
@@ -131,6 +119,18 @@ total pad length of 20 which accounts for subsequences found outside the local a
 	Mscore 46.000000 M1 46 M2 46 MR -8 SD0 18.6776 SD1 39.6954 SD2 50.6719 SD 39.6954
 
 ACLUST was developed and written by Garry Paul Gippert, and packaged as a single C source file in 2023.
+*/
+
+/* programming notes:
+
+This code is still under development.
+
+Global variables generally have g_ prefix. 
+
+Command line paremeters and other program parameters generally have p_ as prefix.
+
+Garry P G. April 9, 2025.
+
 */
 
 #include <stdio.h>
@@ -195,9 +195,9 @@ int p_h = 0;			/* help flag - print variables and exit */
 int p_v = 0;			/* verbose flag, set to 1 for additional diagnostic output */
 double p_go = 10.0;		/* gap open = first gap penalty */
 double p_ge = 0.5;		/* gap extend = next gap penalty */
-int p_gx = 100;			/* maximum gap crossover length (set to 0 to deactivate) */
+int p_gx = 0;			/* maximum gap crossover length (set to 0 to deactivate) */
 int p_maln = 0;			/* read multiple alignment */
-int p_jaln = 1;			/* write alignments as JSON */
+int p_jaln = 0;			/* write alignments as JSON */
 int p_taln = 0;			/* write alignment as text */
 int p_nonself = 0;		/* do not align with self (show only off-diagonal elements */
 int p_metadata = 1;		/* print tree node metadata */
@@ -205,7 +205,7 @@ int p_alignf = 0;		/* read alignfastas output instead of Fasta files */
 
 /* Treebuilding */
 char p_e = 'D';			/* 'D' = distance tree, 'S' = (plus) single embed tree, 'F' = (plus) full recursive embed tree */
-int p_dave = 0;			/* distance averaging flag 0=branch distances, 1= leaf distances */
+int p_dave = 0;			/* distance averaging flag 0=branch distances, 1=leaf distances */
 
 char *scorematrixfile = NULL;
 char *f_dmxfilename = NULL;
@@ -1447,7 +1447,7 @@ void align_fasta()
 
 /* EMBED */
 
-int p_dim = 20;			/* embed dimension: default 20 */
+int p_edim = 20;		/* embed dimension: default 20 */
 int p_ilim = 1000;		/* embed iteration limit: default 1000 */
 double p_clim = 1.0e-12;	/* embed polynomial convergence limit, default 1e-12 */
 
@@ -1525,7 +1525,7 @@ double **metric_matrix(int n, double **d)
 		comsqr[i] -= radsqr;
 		comsqr[i] /= (double)n;
 		if (comsqr[i] < 0.0)
-			fprintf(stderr, "Info: metric_matrix, dim %d, squared center of mass %lf < 0.0, count %d\n",
+			fprintf(stderr, "Info: metric_matrix, embed dimension %d, squared center of mass %lf < 0.0, count %d\n",
 				i, comsqr[i], ++nneg);
 	}
 	for (i = 0; i < n; i++)
@@ -1554,12 +1554,12 @@ double **embed_dmx(int n, double **d)
 {
 	int i, j;
 	double **mx = metric_matrix(n, d);	/* metric matrix (dot products of COM vectors) */
-	double **v = double_matrix(p_dim, n);	/* eigenvectors (dim x n) */
-	double *e = double_vector(p_dim);	/* eigenvalues */
+	double **v = double_matrix(p_edim, n);	/* eigenvectors (dim x n) */
+	double *e = double_vector(p_edim);	/* eigenvalues */
 	double *t = double_vector(n);	/* tmp vector, reused many times in eigvec */
-	double **coord;		/* coordinates (n x dim) */
+	double **coord;		/* coordinates (n x edim) */
 
-	for (j = 0; j < p_dim; j++) {
+	for (j = 0; j < p_edim; j++) {
 		e[j] = eigvec(n, mx, v[j], t);
 		matrix_deflate(n, mx, v[j], e[j]);
 #ifdef DEBUG
@@ -1570,13 +1570,13 @@ double **embed_dmx(int n, double **d)
 		double_vector_scale(n, v[j], -SIGN(e[j]) * sqrt(fabs(e[j])));
 	}
 	double_matrix_free(n, n, mx);
-	double_vector_free(p_dim, e);
+	double_vector_free(p_edim, e);
 	double_vector_free(n, t);
-	coord = double_matrix(n, p_dim);
+	coord = double_matrix(n, p_edim);
 	for (i = 0; i < n; i++)
-		for (j = 0; j < p_dim; j++)
+		for (j = 0; j < p_edim; j++)
 			coord[i][j] = v[j][i];
-	double_matrix_free(p_dim, n, v);
+	double_matrix_free(p_edim, n, v);
 	return (coord);
 }
 
@@ -2592,61 +2592,30 @@ BNODE *bnode_embed_tree(int n, double **dmx)
 {
 	double **pos = embed_dmx(n, dmx);
 	int *index = int_vector_ramp(n);
-	BNODE *P = bnode_tree(pos, index, n, p_dim, dmx);
+	BNODE *P = bnode_tree(pos, index, n, p_edim, dmx);
 	int_vector_free(n, index);
 	return P;
 }
 
-#define COMMAND_LINE_HELP "\n\n\
+#define COMMAND_LINE_HELP "\n\
 ACLUST computes or interpolates pairwise sequence alignments from protein FASTA input, and\n\
 generates a sequence clustering tree based on nearest-neighbor joining of distances.\n\
-Input entries may be pre-aligned, for example Fasta format output produced by MAFFT, or unaligned.\n\
 \n\
-Required:\n\
-	-s <path>		filepath and name of substitution score matrix (e.g., '../dat/BLOSUM62.txt')\n\
-Optional:\n\
-	-p <string>		prefix for all output files (default=name of first input fasta file)\n\
-	-dmxfile <my.dmx>	Skips alignment phase and reads directly distance matrix in labelI labelJ DIJ\n\
-	-go <float>		Gap open penalty\n\
-	-ge <float>		Gap extend penalty\n\
-	-d <integer>		embed dimension (default 20)\n\
-	-e <char>		(D) distance tree only, (S) distance+single embed trees, (F, default) distance+single+full embed trees\n\
-Switches:\n\
-	-maln 			switch ON read multiple alignment fasta\n\
-	-dave			switch OFF average distances from leaf nodes\n\
-	-alignf 		switch ON read from ALIGNFASTAS output instead of FASTA\n\
-	-metadata 		switch OFF write node metadata in tree file\n\
-	-jaln			switch OFF write alignment as JSON file\n\
-	-taln			switch ON write alignment as text file\n\
-	-nonself		deactivates self alignments\n\
-	-v			activates more verbose output\n\
+Output files share a common prefix specified using -p <this> parameter.\n\
+for example: this.aln.txt, this.aln.js, this.dmx.txt, this.dree.txt, this.tree0.txt, and this.tree.txt.\n\
 \n\
-Input files are Fasta with >accession on one line and sequences on following until the next > is reached\n\
-Output files share a prefix <p>, which is default name of first fasta input file\n\
-	<p>_aln.txt	alignments, text\n\
-	<p>_aln.js	alignments individual JSON rows (optional, activate using -j) \n\
-	<p>_dmx.txt	distance matrix, text\n\
-	<p>_dree.txt	distance matrix tree, newick text\n\
-	<p>_tree0.txt	single embed tree, newick text\n\
-	<p>_tree.txt	fulfull embed tree, newick text\n\
+Usage: aclust [flags and or parameters] my.fasta [my.fasta2 [my.fasta3 ...]]\n\
+Use -h parameter to list command line flags and parameters.\n\
 \n\
-DETAILS: Score distance matrix based on pairwise local sequence\n\
-alignments (Smith & Waterman) OR multiple alignment given in input\n\
-Fasta records. Scoredist values (Sonnhammer & Hollich) are normalized\n\
-to the shorter sequence length.  Tree computed from distance matrix\n\
-by embedding into orthogonal coordinates (metric matrix distance\n\
-geometry) and nearest-neighbor joining. Tree refined by re-embedding\n\
-and neighbor-joining points in each sub-branch independently, and\n\
-recursively. A pure distance NNJ tree is computed also.\n\
-\n\
+SEE ALSO: https://github.com/GarryGippert/aclust\n\
 AUTHOR: Garry Paul Gippert, GarryG@dtu.dk, DTU Bioengineering\n\
 "
 
 void command_line_help(int c, int argc, char *argv[])
 {
-	fprintf(stderr, "%s [command_line_parameters_and_flags] my.fasta [another.fasta ...] %s",
-		argv[0], COMMAND_LINE_HELP), exit(0);
+	fprintf(stderr, "%s", COMMAND_LINE_HELP), exit(0);
 }
+
 void parameter_value_missing(int cstart, int argc, char *argv[])
 {
 	int c = cstart - 1;
@@ -2682,11 +2651,11 @@ int pparse(int argc, char *argv[])
 			p_dave = (p_dave + 1) % 2;
 			fprintf(stderr, "distance averaging flag set to %d\n", p_dave);
 		}
-		else if (strncmp(argv[c], "-d", 2) == 0) {
+		else if (strncmp(argv[c], "-edim", 2) == 0) {
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
-			if (sscanf(argv[c], "%d", &p_dim) == 1)
-				fprintf(stderr, "dimension set to %d\n", p_dim);
+			if (sscanf(argv[c], "%d", &p_edim) == 1)
+				fprintf(stderr, "embed dimension set to %d\n", p_edim);
 			else
 				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
 			c++;
@@ -2781,23 +2750,25 @@ int pparse(int argc, char *argv[])
 
 	}
 	
-	fprintf(stderr, "Command line parameter summary:\n");
-	fprintf(stderr, " multiple alignment input flag %d\n", p_maln);
-	fprintf(stderr, " distance averaging flag %d\n", p_dave);
-	fprintf(stderr, " distance matrix input filename '%s'\n", f_dmxfilename);
-	fprintf(stderr, " substitution score matrix file '%s'\n", scorematrixfile);
-	fprintf(stderr, " output file prefix '%s'\n", oprefix);
-	fprintf(stderr, " align nonself flag %d\n", p_nonself);
-	fprintf(stderr, " affine gap open penalty %g\n", p_go);
-	fprintf(stderr, " affine gap extension penalty %g\n", p_ge);
-	fprintf(stderr, " affine gap crossover maxlength %d\n", p_gx);
-	fprintf(stderr, " write json alignments %d\n", p_jaln);
-	fprintf(stderr, " write text alignments %d\n", p_taln);
-	fprintf(stderr, " tree metadata flag %d\n", p_metadata);
-	fprintf(stderr, " tree type %c\n", p_e);
-	fprintf(stderr, " tree embed dimension %d\n", p_dim);
-	fprintf(stderr, " aclust verbose flag %d\n", p_v);
-	fprintf(stderr, " aclust help flag %d\n", p_h);
+	fprintf(stderr, "Command line flags:\n");
+	fprintf(stderr, " -maln		flag input is multiple alignment(%d)\n", p_maln);
+	fprintf(stderr, " -alignf	flag input is alignfastas (%d)\n", p_alignf);
+	fprintf(stderr, " -dave		flag tree distance averaging (%d)\n", p_dave);
+	fprintf(stderr, " -nonself	flag nonself alignments (%d)\n", p_nonself);
+	fprintf(stderr, " -jaln		flag write json alignments (%d)\n", p_jaln);
+	fprintf(stderr, " -taln		flag write text alignments (%d)\n", p_taln);
+	fprintf(stderr, " -metadata	flag include distance/pctid metadata in written Newick tree (%d)\n", p_metadata);
+	fprintf(stderr, " -v		flag program verbose and diagnostic output (%d)\n", p_v);
+	fprintf(stderr, " -h		flag program help (%d)\n", p_h);
+	fprintf(stderr, "Command line parameters:\n");
+	fprintf(stderr, " -dmxfilename %s	(char*) filename optional distance matrix input\n", f_dmxfilename);
+	fprintf(stderr, " -s %s	 (char*) filename required substitution score matrix input\n", scorematrixfile);
+	fprintf(stderr, " -p %s	(char*) prefix for all output files\n", oprefix);
+	fprintf(stderr, " -go %-8g	(double) value of affine gap open penalty\n", p_go);
+	fprintf(stderr, " -ge %-8g	(double) value of affine gap extension penalty\n", p_ge);
+	fprintf(stderr, " -gx %-8d	(integer) value affine gap crossover maxlength (0 to deactivate)\n", p_gx);
+	fprintf(stderr, " -e %c		(char) tree output: D=distance only, S=single embed, F=full recursive embed\n", p_e);
+	fprintf(stderr, " -edim %-8d	(integer) embed dimension\n", p_edim);
 	if (p_h)
 		command_line_help(c, argc, argv);
 
@@ -2909,14 +2880,14 @@ void read_alignf(int argc, char *argv[], int cstart)
 }
 
 void read_dmx(char *filename)
-	/* read distance matrix from a file.
-	 * This involves parsing the file twice,
-	 * 	first to review the number of unique labels
-	 * 	second to allocate and fill in the distance matrix
+	/* read distance matrix from a text file with line format:
+	 *	labelI labelJ DistanceIJ
+	 * The file is read twice, first to parse and establish the uniq list of labels,
+	 * second to parse and fill in the allocated distance matrix.
 	 */
 {
 	g_nent = 0;
-	fprintf(stderr, "%s Read Distance matrix from file %s\n", filename);
+	fprintf(stderr, "Read Distance matrix from file %s\n", filename);
 	char line[MAXLINELEN], word1[MAXWORDLEN], word2[MAXWORDLEN];
 	float value;
 	int index1, index2;
@@ -3037,8 +3008,8 @@ int main(int argc, char *argv[])
 	free(treefile);
 
 	/* Continue with tree based on full recursive embedding. */
-	tree->left = bnode_reembed(tree->left, 'L', global_dmx, g_nent, p_dim);
-	tree->right = bnode_reembed(tree->right, 'R', global_dmx, g_nent, p_dim);
+	tree->left = bnode_reembed(tree->left, 'L', global_dmx, g_nent, p_edim);
+	tree->right = bnode_reembed(tree->right, 'R', global_dmx, g_nent, p_edim);
 	treefile = char_vector(strlen(oprefix) + strlen(".tree.txt") + 1);
 	sprintf(treefile, "%s%s", oprefix, ".tree.txt");
 	write_tree(tree, treefile);
