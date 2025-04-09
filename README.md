@@ -15,7 +15,7 @@ Scattered diagnostics are printed variously to stdout and stderr.
 
 ### Output files
 
-All output files share a common prefix (-p this)
+All output files share a common prefix (-p prefix)
 
 Default output files:
 
