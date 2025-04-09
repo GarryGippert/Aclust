@@ -3,36 +3,48 @@
 
 ACLUST is a C-language program that generates a phylogenetic tree from protein sequence Fasta input.
 
-A binary tree is based on a NNJ (Nearest Neighbor Joining) algorithm in the space of all-vs-all pairwise sequence distances computed using
-a modified version of ScoreDist (Sonnhammer & Hollich 2005).
-
-Pairwise alignments are computed from local alignments (Smith & Waterman 1981) or interpolated from a user-supplied multiple sequence aligment.
-
-Additional trees may be built in orthogonal coordinate space after embedding the distance matrix using metric matrix
-distance geometry (Crippen & Havel 1988).
-
 ### Program input
 
-One or more FASTA files. To input Fasta records in a multiple alignment use the -maln flag. Otherwise aclust
-will run all-vs-all pairwise alignments.
+One or more protein sequence files in FASTA format. If input records represent a multiple alignment use the -maln flag.
+Otherwise aclust will run all-vs-all pairwise alignments.
 
-### Output
+### Program output
 
-The program produces some messages on stdout and stderr. In addition (with a common prefix):
+One or more trees in Newick format. Alignments in JSON-adjacent and/or Text formats. Distance matrix in text format.
+Scattered diagnostics are printed variously to stdout and stderr.
 
-prefix.aln.js	pairwise alignments JSON-like format (default ON, can be disabled)
+### Output files
 
-prefix.aln.txt	pairwise alignments Text (non-standard) format (default OFF, can be enabled)
+All output files share a common prefix (-p this)
 
-prefix.dmx.txt	pairwise scoredistances (default ON)
+Default output files:
 
-prefix.dree.txt	tree in Newick format, computed using NNJ in distance space
+* prefix.aln.js		pairwise alignments in JSON-like format
+* prefix.dmx.txt	pairwise scoredistances
+* prefix.dree.txt	distance NNJ tree in Newick format
 
-optional:
+Optional output files:
 
-prefix.tree0.txt	tree in Newick format, computed from NNJ in the space of embedded orthogonal coordinates
+* prefix.aln.txt	pairwise alignments Text (non-standard) format (default OFF, can be enabled)
+* prefix.tree0.txt	tree in Newick format, computed from NNJ in the space of embedded orthogonal coordinates
+* prefix.tree.txt		tree in Newick format, computed using recursive NNJ/embed
 
-prefix.tree.txt		tree in Newick format, computed using recursive NNJ/embed
+### Inner workings
+
+Pairwise alignments are interpolated from a user-supplied multiple sequence alignment, or computed using a modified local alignment algorithm (based on Smith & Waterman 1981).
+The unpublished modification to SW includes a gap-crossover allowance (for gaps that start in one sequence and end in the other).
+
+By convention BLOSUM62 substitution scores are used.
+
+Pairwise distances are based on a modified ScoreDist function (Sonnhammer & Hollich 2005). The unpublished modification normalizes the expectation score to
+sequence length rather than alignment length. By convention the shorter sequence is used.
+
+The first tree is computed using a Nearest Neighbor Joining (NNJ) algorithm in the space of all-vs-all pairwise sequence distances. Distances are recomputed using either
+branch-averaging leaf-leaf distance averaing may be used as determined by a command line parameter -dave.
+
+A second tree is (optionally) is based on NNJ in the space of 20-dimensional orthogonal coordinates obtained by embedding the distance matrix using distance geomery (Crippen & Havel 1988).
+
+A third tree is (optionally and more slowly) obtained by a recursive application of NNJ and re-embedding to each subbranch of the initial embed tree.
 
 ### Usage:
 
