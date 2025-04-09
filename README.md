@@ -39,11 +39,16 @@ Download the code: <pre>git clone git@github.com:GarryGippert/Aclust.git</pre>
 
 <pre>cd Aclust</pre>
 
-Compile aclust program (requires gcc or similar C-compiler): <pre>cd src; make; make install</pre>
+Compile aclust program (requires gcc or similar C-compiler): <pre>cd src; make</pre>
 
-Run the program: <pre>bin/aclust -s dat/BLOSUM62.dat my.fa</pre>
+Run the program: <pre>aclust -s ../dat/BLOSUM62.dat my.fa</pre>
 
-Help with command line parameters: <pre>bin/aclust -h</pre>
+If you move or run the program from another location, you must refer to the correct
+path to the substitution score matrix file Aclust/dat/BLOSUM62.dat using the -s parameter.
+
+<pre>aclust -s somepath/Aclust/dat/BLOSUM62.dat my.fasta</pre>
+
+Additional help is available using the -h flag <pre>bin/aclust -h</pre>
 
 ### References
 
