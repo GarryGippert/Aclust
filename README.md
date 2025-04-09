@@ -13,7 +13,8 @@ distance geometry (Crippen & Havel 1988).
 
 ### Program input
 
-One or more FASTA files. If the command line parameter '-maln' is given the input FASTA records are assumed to be already in a multiple alignment.
+One or more FASTA files. To input Fasta records in a multiple alignment use the -maln flag. Otherwise aclust
+will run all-vs-all pairwise alignments.
 
 ### Output
 
