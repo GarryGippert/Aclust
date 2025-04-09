@@ -1886,7 +1886,6 @@ void within(double **mx, int n, int *index, double *ave, double *sd)
 void bnode_print_metadata(FILE *fp, BNODE *left, BNODE *right)
 /* print metadata comparing left and right branches */
 {
-
 	/* leaf nodes in left subtree */
 	int n = bnode_count(left);
 	int *index = int_vector(n), i = 0;
@@ -1909,6 +1908,7 @@ void bnode_print_metadata(FILE *fp, BNODE *left, BNODE *right)
 	double adis, sd_adis;
 	within(global_dmx, o, kndex, &adis, &sd_adis);
 
+	/* report average pct, identity and standard deviations of these within the entire branch */
 	fprintf(fp, "[&apct=%.1f,adis=%.1f,sd_apct=%.1f,sd_adis=%.1f", apct, adis, sd_apct, sd_adis);
 
 	double bpct, sd_bpct;
@@ -1917,8 +1917,15 @@ void bnode_print_metadata(FILE *fp, BNODE *left, BNODE *right)
 	double bdis, sd_bdis;
 	between(global_dmx, n, index, m, jndex, &bdis, &sd_bdis);
 
-	fprintf(fp, ",&bpct=%.1f,bdis=%.1f,sd_bpct=%.1f,sd_bdis=%.1f]", bpct, bdis, sd_bpct, sd_bdis);
+	/* report average pct, identity and standard deviations of these between left and right branches */
+	fprintf(fp, ",bpct=%.1f,bdis=%.1f,sd_bpct=%.1f,sd_bdis=%.1f]", bpct, bdis, sd_bpct, sd_bdis);
 
+#ifdef DEBUG
+	/* print out all indices and lists and inspect once visually to make sure code works */
+	printf("N %d :", n); for (i = 0; i < n; i++) printf(" (%d,%d)", i, index[i]); printf("\n");
+	printf("M %d :", m); for (j = 0; j < m; j++) printf(" (%d,%d)", j, jndex[j]); printf("\n");
+	printf("O %d :", o); for (k = 0; k < o; k++) printf(" (%d,%d)", k, kndex[k]); printf("\n");
+#endif
 	free((char *)index);
 	free((char *)jndex);
 	free((char *)kndex);
