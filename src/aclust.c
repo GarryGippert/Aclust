@@ -1971,8 +1971,9 @@ void bnode_print_tree(FILE * fp, BNODE * B)
 
 void bnode_print(FILE * fp, BNODE * B)
 {
+	fprintf(fp, "(");	/* initiate tree */
 	bnode_print_tree(fp, B);
-	fprintf(fp, ":0;");	/* terminate tree */
+	fprintf(fp, ":0);");	/* terminate tree final branch length is zero */
 	if (PRINTNL)
 		fprintf(fp, "\n");
 }
