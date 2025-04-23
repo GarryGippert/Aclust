@@ -16,7 +16,7 @@ additional algorithmic cost. By default the BLOSUM62 amino-acid substitution sco
 	output file: prefix.aln.js and/or prefix.aln.txt
 
 The user may skip computing or interpolating alignments by either supplying a distance matrix using
-the -dmxfile parameter, or reading ALIGNFASTAS files (local convention) using the -alignf flag.
+the -dmx parameter, or reading ALIGNFASTAS files (local convention) using the -alf flag.
 
 Distance matrix:
 
@@ -197,12 +197,13 @@ int p_v = 0;			/* verbose flag, set to 1 for additional diagnostic output */
 double p_go = 10.0;		/* gap open = first gap penalty */
 double p_ge = 0.5;		/* gap extend = next gap penalty */
 int p_gx = 0;			/* maximum gap crossover length (set to 0 to deactivate) */
+
 int p_msa = 0;			/* multiple sequence alignment input (FASTA only) */
+int p_alf = 0;			/* alignfastas input (and not Fasta files) */
 int p_jaln = 0;			/* write alignments as JSON */
 int p_taln = 0;			/* write alignment as text */
 int p_nonself = 0;		/* do not align with self (show only off-diagonal elements */
 int p_metadata = 1;		/* print tree node metadata */
-int p_alignf = 0;		/* read alignfastas output instead of Fasta files */
 
 /* Treebuilding */
 char p_e = 'D';			/* 'D' = distance tree, 'S' = (plus) single embed tree, 'F' = (plus) full recursive embed tree */
@@ -2636,12 +2637,28 @@ int pparse(int argc, char *argv[])
 {
 	int c = 1;
 	while (c < argc) {
-		if (strncmp(argv[c], "-dmxfile", 8) == 0) {
+		/* flag to read multiple sequence alignment input */
+		if (strncmp(argv[c], "-msa", 4) == 0) {
+			++c;
+			p_msa = (p_msa + 1)%2;
+			fprintf(stderr, "Multipl Sequence Alignment input %d\n", p_msa);
+		}
+
+		/* flag to read alignfastas input */
+		else if (strncmp(argv[c], "-alf", 4) == 0) {
+			++c;
+			p_alf = (p_alf + 1) % 2;
+			fprintf(stderr, "alf flag set to %d\n", p_alf);
+		}
+
+		/* flag to read distance matrix file input */
+		else if (strncmp(argv[c], "-dmx", 4) == 0) {
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
 			f_dmxfilename = char_string(argv[c++]);
 			fprintf(stderr, "f_dmxfilename set to '%s'\n", f_dmxfilename);
 		}
+
 		else if (strncmp(argv[c], "-s", 2) == 0) {
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
@@ -2654,13 +2671,12 @@ int pparse(int argc, char *argv[])
 			oprefix = char_string(argv[c++]);
 			fprintf(stderr, "output prefix set to '%s'\n", oprefix);
 		}
-		/* D */
 		else if (strncmp(argv[c], "-dave", 5) == 0) {
 			++c;
 			p_dave = (p_dave + 1) % 2;
 			fprintf(stderr, "distance averaging flag set to %d\n", p_dave);
 		}
-		else if (strncmp(argv[c], "-edim", 2) == 0) {
+		else if (strncmp(argv[c], "-edim", 5) == 0) {
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
 			if (sscanf(argv[c], "%d", &p_edim) == 1)
@@ -2706,11 +2722,6 @@ int pparse(int argc, char *argv[])
 			c++;
 		}
 		/* switch ON <-> OFF */
-		else if (strncmp(argv[c], "-alignf", 7) == 0) {
-			++c;
-			p_alignf = (p_alignf + 1) % 2;
-			fprintf(stderr, "alignf flag set to %d\n", p_alignf);
-		}
 		else if (strncmp(argv[c], "-nonself", 8) == 0) {
 			++c;
 			p_nonself = (p_nonself + 1) % 2;
@@ -2720,11 +2731,6 @@ int pparse(int argc, char *argv[])
 			++c;
 			p_metadata = (p_metadata + 1) % 2;
 			fprintf(stderr, "write node metadata %d\n", p_metadata);
-		}
-		else if (strncmp(argv[c], "-msa", 4) == 0) {
-			++c;
-			p_msa = (p_msa + 1)%2;
-			fprintf(stderr, "Multipl Sequence Alignment input %d\n", p_msa);
 		}
 		else if (strncmp(argv[c], "-jaln", 5) == 0) {
 			++c;
@@ -2759,25 +2765,27 @@ int pparse(int argc, char *argv[])
 
 	}
 	
-	fprintf(stderr, "Command line flags:\n");
+	fprintf(stderr, "Input parameters:\n");
 	fprintf(stderr, " -msa		multiple sequence alignment input (%d)\n", p_msa);
-	fprintf(stderr, " -alignf	flag input is alignfastas (%d)\n", p_alignf);
-	fprintf(stderr, " -dave		flag tree distance averaging (%d)\n", p_dave);
-	fprintf(stderr, " -nonself	flag nonself alignments (%d)\n", p_nonself);
-	fprintf(stderr, " -jaln		flag write json alignments (%d)\n", p_jaln);
-	fprintf(stderr, " -taln		flag write text alignments (%d)\n", p_taln);
-	fprintf(stderr, " -metadata	flag include distance/pctid metadata in written Newick tree (%d)\n", p_metadata);
-	fprintf(stderr, " -v		flag program verbose and diagnostic output (%d)\n", p_v);
-	fprintf(stderr, " -h		flag program help (%d)\n", p_h);
-	fprintf(stderr, "Command line parameters:\n");
-	fprintf(stderr, " -dmxfilename %s	(char*) filename optional distance matrix input\n", f_dmxfilename);
-	fprintf(stderr, " -s %s	 (char*) filename required substitution score matrix input\n", scorematrixfile);
-	fprintf(stderr, " -p %s	(char*) prefix for all output files\n", oprefix);
+	fprintf(stderr, " -alf		alignfastas input (%d)\n", p_alf);
+	fprintf(stderr, " -dmx %s	distance matrix input\n", f_dmxfilename);
+	fprintf(stderr, "Alignment parameters:\n");
+	fprintf(stderr, " -s %s	filename required substitution score matrix input\n", scorematrixfile);
+	fprintf(stderr, " -nonself	nonself alignments (%d)\n", p_nonself);
 	fprintf(stderr, " -go %-8g	(double) value of affine gap open penalty\n", p_go);
 	fprintf(stderr, " -ge %-8g	(double) value of affine gap extension penalty\n", p_ge);
 	fprintf(stderr, " -gx %-8d	(integer) value affine gap crossover maxlength (0 to deactivate)\n", p_gx);
-	fprintf(stderr, " -e %c		(char) tree output: D=distance only, S=single embed, F=full recursive embed\n", p_e);
+	fprintf(stderr, "Tree-building parameters:\n");
+	fprintf(stderr, " -dave		distance averaging mode (%d)\n", p_dave);
+	fprintf(stderr, " -e %c		D=distance tree, S=also single embed tree, F=also full recursive embed tree\n", p_e);
 	fprintf(stderr, " -edim %-8d	(integer) embed dimension\n", p_edim);
+	fprintf(stderr, "Output parameters:\n");
+	fprintf(stderr, " -p %s	prefix for output files\n", oprefix);
+	fprintf(stderr, " -jaln		flag write json alignments (%d)\n", p_jaln);
+	fprintf(stderr, " -taln		flag write text alignments (%d)\n", p_taln);
+	fprintf(stderr, " -metadata	tree includes metadata distance/pctid (%d)\n", p_metadata);
+	fprintf(stderr, " -v		verbose stdout and/or stderr (%d)\n", p_v);
+	fprintf(stderr, " -h		show help and quit (%d)\n", p_h);
 	if (p_h)
 		command_line_help(c, argc, argv);
 
@@ -2815,10 +2823,10 @@ int facc_index(char *word)
 
 /* remember MAXENTRIES 10000 int g_nent = 0; char *facc[MAXENTRIES]; */
 
-void read_alignf(int argc, char *argv[], int cstart)
-	/* Read a bunch of alignfastas output files */
+void read_alf(int argc, char *argv[], int cstart)
+	/* Read input from alignfastas output files */
 {
-	fprintf(stderr, "%s Trying to read alignfasta file(s) start %d of %d\n", argv[0], cstart, argc);
+	fprintf(stderr, "%s Trying to read alignfastas file(s) start %d of %d\n", argv[0], cstart, argc);
 	g_nsrc = g_nent = 0;
 	char line[MAXLINELEN], word1[MAXWORDLEN], word2[MAXWORDLEN];
 	double alnid, sdmin;
@@ -2965,9 +2973,9 @@ int main(int argc, char *argv[])
 		/* read dmx from a file */
 		read_dmx(f_dmxfilename);
 	}
-	else if (p_alignf) {
+	else if (p_alf) {
 		/* read dmx from alignfasta file(s) */
-		read_alignf(argc, argv, c);
+		read_alf(argc, argv, c);
 		write_dmx(oprefix);
 	}
 	else {
