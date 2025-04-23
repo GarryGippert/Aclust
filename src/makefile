@@ -1,4 +1,5 @@
-BIN = ../bin
+BIN = $(HOME)/bin/`arch`
+VERSION = `git log -n 1 --pretty="format:%h %ci"`
 LFLAGS = -lm
 EXE = aclust
 
@@ -12,6 +13,11 @@ EXE = aclust
 	$(CC) -c $<
 
 all: $(EXE)
+
+save:
+	echo "#define VERSION \"$(VERSION)\"" > version.txt
+	git commit aclust.c version.txt makefile
+	git push
 
 clean:
 	/bin/rm -rf *.o *~ core* $(EXE)

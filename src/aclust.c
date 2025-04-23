@@ -2610,19 +2610,17 @@ BNODE *bnode_embed_tree(int n, double **dmx)
 }
 
 #define COMMAND_LINE_HELP "\n\
-ACLUST computes or interpolates pairwise sequence alignments from protein FASTA input, and\n\
-generates a sequence clustering tree based on nearest-neighbor joining of distances.\n\
+Usage: aclust [command line parameters] my.fasta [my.fasta2 [my.fasta3 ...]]\n\
+Usage: aclust -h    to see the list of command line flags and parameters.\n\
 \n\
-Output files share a common prefix specified using -p <this> parameter.\n\
-for example: this.aln.txt, this.aln.js, this.dmx.txt, this.dree.txt, this.tree0.txt, and this.tree.txt.\n\
-\n\
-Usage: aclust [flags and or parameters] my.fasta [my.fasta2 [my.fasta3 ...]]\n\
-Use -h parameter to list command line flags and parameters.\n\
+Basic operation: ACLUST produces a nearest-neighbor joining tree in Newick format\n\
+based on sequence pairwise distances.  Input is one or more protein sequence files\n\
+in FASTA format. ACLUST either calculates pairwise local sequence alignments, or\n\
+interpolates them from an MSA (use the -msa flag).\n\
 \n\
 SEE ALSO: https://github.com/GarryGippert/aclust\n\
 AUTHOR: Garry Paul Gippert, GarryG@dtu.dk, DTU Bioengineering\n\
 "
-
 
 void parameter_value_missing(int cstart, int argc, char *argv[])
 {
