@@ -6,9 +6,10 @@ builds a nearest-neighbor joining (NNJ) tree from the matrix of pairwise distanc
 
 Sequence alignments:
 
-Supply a multiple alignment by using the -maln command line flag, otherwise local sequence pairwise
-alignments are computed using a modified local alignment (Smith & Waterman, 1981) with affine gap
-penalties. The (unpublished) modification allows a gap crossover (gap that starts in one sequence
+Provide a multiple sequence alignment using the -msa flag. Otherwise pairwise sequence alignments
+are computed using a modified local alignment (Smith & Waterman, 1981) with affine gap penalties.
+
+The (unpublished) modification allows a gap crossover (gap that starts in one sequence
 and ends in the other). A gap crossover allowance may slightly improve some alignments, but incurs
 additional algorithmic cost. By default the BLOSUM62 amino-acid substitution score matrix is used.
 
@@ -196,7 +197,7 @@ int p_v = 0;			/* verbose flag, set to 1 for additional diagnostic output */
 double p_go = 10.0;		/* gap open = first gap penalty */
 double p_ge = 0.5;		/* gap extend = next gap penalty */
 int p_gx = 0;			/* maximum gap crossover length (set to 0 to deactivate) */
-int p_maln = 0;			/* read multiple alignment */
+int p_msa = 0;			/* multiple sequence alignment input (FASTA only) */
 int p_jaln = 0;			/* write alignments as JSON */
 int p_taln = 0;			/* write alignment as text */
 int p_nonself = 0;		/* do not align with self (show only off-diagonal elements */
@@ -1391,8 +1392,8 @@ void align_stats(ALN *A, int expected_plen, double expected_ascore)
 	}
 }
 
-ALN *pair_malign(int fi, int fj)
-	/* return interpolated pairwise alignment (from input multiple alignment) of fasta entries fi vs fj */
+ALN *pair_msa(int fi, int fj)
+/* Return pairwise alignment of fasta entries fi vs fj interpolated/inferred from multiple sequence alignment */
 {
 	char *a1 = fseq[fi], *a2 = fseq[fj];
 	ALN *A = aln_obj(facc[fi], facc[fj], NULL, NULL, fseq[fi], fseq[fj]);
@@ -1400,8 +1401,8 @@ ALN *pair_malign(int fi, int fj)
 	return(A);
 }
 
-ALN *pair_align(int fi, int fj)
-	/* return computed pairwise alignment (using Smith-Waterman 1981) of fasta entries fi vs fj */
+ALN *pair_sw(int fi, int fj)
+/* Return pairwise alignment of fasta entries fi vs fj computed using local aligment algorithm (Smith-Waterman 1981) */
 {
 	int align_flag = ALIGN_GAP | ALIGN_PAD | ALIGN_CROSS;
 	char *s1 = fseq[fi], *s2 = fseq[fj];
@@ -1433,7 +1434,7 @@ void align_fasta()
 	ALN *A;
 	for (i = 0; i < g_nent; i++) {
 		for (j = (p_nonself ? i + 1 : i); j < g_nent; j++) {
-			A =  (p_maln ? pair_malign(i, j) : pair_align(i, j));
+			A =  (p_msa ? pair_msa(i, j) : pair_sw(i, j));
 			if (p_jaln)
 				aln_write_json(A);
 			if (p_taln)
@@ -2720,10 +2721,10 @@ int pparse(int argc, char *argv[])
 			p_metadata = (p_metadata + 1) % 2;
 			fprintf(stderr, "write node metadata %d\n", p_metadata);
 		}
-		else if (strncmp(argv[c], "-maln", 5) == 0) {
+		else if (strncmp(argv[c], "-msa", 4) == 0) {
 			++c;
-			p_maln = (p_maln + 1)%2;
-			fprintf(stderr, "Read multiple alignment %d\n", p_maln);
+			p_msa = (p_msa + 1)%2;
+			fprintf(stderr, "Multipl Sequence Alignment input %d\n", p_msa);
 		}
 		else if (strncmp(argv[c], "-jaln", 5) == 0) {
 			++c;
@@ -2759,7 +2760,7 @@ int pparse(int argc, char *argv[])
 	}
 	
 	fprintf(stderr, "Command line flags:\n");
-	fprintf(stderr, " -maln		flag input is multiple alignment(%d)\n", p_maln);
+	fprintf(stderr, " -msa		multiple sequence alignment input (%d)\n", p_msa);
 	fprintf(stderr, " -alignf	flag input is alignfastas (%d)\n", p_alignf);
 	fprintf(stderr, " -dave		flag tree distance averaging (%d)\n", p_dave);
 	fprintf(stderr, " -nonself	flag nonself alignments (%d)\n", p_nonself);
