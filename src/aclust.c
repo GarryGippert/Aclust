@@ -145,6 +145,8 @@ Garry P G. April 9, 2025.
 #include <limits.h>
 #include <unistd.h>
 
+#include "version.txt"
+
 int clocktime(int prev)
 /* return seconds (clock time) since prev */
 {
@@ -2621,10 +2623,6 @@ SEE ALSO: https://github.com/GarryGippert/aclust\n\
 AUTHOR: Garry Paul Gippert, GarryG@dtu.dk, DTU Bioengineering\n\
 "
 
-void command_line_help(int c, int argc, char *argv[])
-{
-	fprintf(stderr, "%s", COMMAND_LINE_HELP), exit(0);
-}
 
 void parameter_value_missing(int cstart, int argc, char *argv[])
 {
@@ -2768,9 +2766,9 @@ int pparse(int argc, char *argv[])
 	fprintf(stderr, "Input parameters:\n");
 	fprintf(stderr, " -msa		multiple sequence alignment input (%d)\n", p_msa);
 	fprintf(stderr, " -alf		alignfastas input (%d)\n", p_alf);
-	fprintf(stderr, " -dmx %s	distance matrix input\n", f_dmxfilename);
+	fprintf(stderr, " -dmx %s	distance matrix input (filename)\n", f_dmxfilename);
 	fprintf(stderr, "Alignment parameters:\n");
-	fprintf(stderr, " -s %s	filename required substitution score matrix input\n", scorematrixfile);
+	fprintf(stderr, " -s %s	substitution score matrix (filename)\n", scorematrixfile);
 	fprintf(stderr, " -nonself	nonself alignments (%d)\n", p_nonself);
 	fprintf(stderr, " -go %-8g	(double) value of affine gap open penalty\n", p_go);
 	fprintf(stderr, " -ge %-8g	(double) value of affine gap extension penalty\n", p_ge);
@@ -2786,8 +2784,12 @@ int pparse(int argc, char *argv[])
 	fprintf(stderr, " -metadata	tree includes metadata distance/pctid (%d)\n", p_metadata);
 	fprintf(stderr, " -v		verbose stdout and/or stderr (%d)\n", p_v);
 	fprintf(stderr, " -h		show help and quit (%d)\n", p_h);
-	if (p_h)
-		command_line_help(c, argc, argv);
+	if (p_h) {
+		fprintf(stderr, "%s", COMMAND_LINE_HELP);
+		fprintf(stderr, "ACLUST VERSION: %s\n", VERSION);
+		exit(0);
+	}
+	printf("ACLUST VERSION: %s\n", VERSION);
 
 	/* some validation */
 	if (strchr("DSF", p_e) == NULL)
