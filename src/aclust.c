@@ -1482,7 +1482,7 @@ double eigvec(int n, double **mx, double *v, double *t)
 			break;
 		ratio = fabs((value - prev) / value);
 		if (p_v)
-			printf("# EIGVAL iter(%d) prev(%e) value(%e) conv(%e)\n", count, prev, value, ratio);
+			fprintf(stderr, "# EIGVAL iter(%d) prev(%e) value(%e) conv(%e)\n", count, prev, value, ratio);
 		/* normalize */
 		norm = 0.0;
 		for (i = 0; i < n; i++)
@@ -2150,8 +2150,8 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
         				between(global_dmx, nl, lindex, nr, rindex, &dis, &sd_dis);
 					smx[i][m] = smx[m][i] = dis;
 					if (p_v > 1)
-					fprintf(stderr, "D m %d (%d) i %d (%d) = %g +/- %g\n",
-						m, nl, i, nr, dis, sd_dis);
+						fprintf(stderr, "D m %d (%d) i %d (%d) = %g +/- %g\n",
+							m, nl, i, nr, dis, sd_dis);
 				}
 			}
 		}
@@ -2615,9 +2615,16 @@ Usage: aclust [command line parameters] my.fasta [my.fasta2 [my.fasta3 ...]]\n\
 Usage: aclust -h    to see the list of command line flags and parameters.\n\
 \n\
 Basic operation: ACLUST produces a nearest-neighbor joining tree in Newick format\n\
-based on sequence pairwise distances.  Input is one or more protein sequence files\n\
-in FASTA format. ACLUST either calculates pairwise local sequence alignments, or\n\
-interpolates them from an MSA (use the -msa flag).\n\
+based on sequence pairwise distances.\n\
+\n\
+Option 1: Aclust performs pairwise alignments from sequence Fasta:\n\
+	aclust my.fasta [my.fasta2 ...]\n\
+Option 2: Aclust reads an MSA (multiple sequence alignment) Fasta\n\
+	aclust -msa my.multiplealignment.fasta\n\
+Option 3: Aclust reads distances from Alignfastas output\n\
+	aclust -alf my.alignfastas [my.alignfastas2 ...]\n\
+Option 3b: Align reads from alignfastas files, but generates a tree for a subsest of labels\n\
+	aclust -alf -acc my.accessions my.alignfastas [my.alignfastas2 ...]\n\
 \n\
 SEE ALSO: https://github.com/GarryGippert/aclust\n\
 AUTHOR: Garry Paul Gippert, GarryG@dtu.dk, DTU Bioengineering\n\
@@ -2842,6 +2849,27 @@ void read_alf(int argc, char *argv[], int cstart)
 	FILE *fp;
 	int c, index1, index2, i, j;
 	double pctid, sdist, **tmp_dmx = NULL, **tmp_imx = NULL;
+	/* do we only want a specific subset of accessions ?
+	*/
+	int subset = 0;
+	if (f_accessionsfile != NULL) {
+		if ((fp = fopen(f_accessionsfile, "r")) == NULL)
+			fprintf(stderr, "Could not open accessions filename %s\n", f_accessionsfile), exit(1);
+		while (fgets(line, sizeof(line), fp) != NULL) {
+			if (strlen(line) == 0 || line[0] == '#')
+				continue;
+			if (sscanf(line, "%s", label1) != 1)
+				fprintf(stderr, "Could not sscanf label from line >>%s<<\n", line), exit(1);
+			/* return or assign accession indices */
+			while((index1 = facc_index(label1)) < 0)
+				facc[g_nent++] = char_string(label1);
+			if (p_v)
+				fprintf(stderr, "accession label %d label %s\n", facc_index(label1), label1);
+		}
+		fprintf(stderr, "Accessions count %d\n", g_nent);
+		fclose(fp);
+		subset = g_nent;
+	}
 	/* allocate tmp matrices for pairwise distance, which is used in tree building,
 	   and pairwise alignment percent identity which is used later in tree branch metadata.
 	   and fill them with -99.9 meaning undefined value.  */
@@ -2849,10 +2877,10 @@ void read_alf(int argc, char *argv[], int cstart)
 		fprintf(stderr, "could not allocate tmp_dmx double_matrix %d x %d\n", MAXENTRIES, MAXENTRIES), exit(1);
 	if ((tmp_imx = double_matrix(MAXENTRIES, MAXENTRIES)) == NULL)
 		fprintf(stderr, "could not allocate tmp_imx double_matrix %d x %d\n", MAXENTRIES, MAXENTRIES), exit(1);
-	/* initialize tmp matrices to -99.9, to test later for undefined elements */
 	for (i = 0; i < g_nent; i++)
 	for (j = 0; j < g_nent; j++)
-		global_dmx[i][j] = global_imx[i][j] = -99.0;
+		tmp_dmx[i][j] = tmp_imx[i][j] = -99.0;
+	int parsed = 0, skipped = 0, included = 0;
 	for (c = cstart; c < argc; c++) {
 		fprintf(stderr, " argv[%d], %s\n", c, argv[c]);
 		if ((fp = fopen(argv[c], "r")) == NULL)
@@ -2863,21 +2891,29 @@ void read_alf(int argc, char *argv[], int cstart)
 			if (sscanf(line, "%*s %s %*d %s %*d %*d %*d %*d %*d %*d %*d %*d %*d %lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %lf",
 				label1, label2, &pctid, &sdist) != 4)
 				fprintf(stderr, "Could not sscanf label1, label2, pctid, sdist from line >>%s<<\n", line), exit(1);
-			/* return or assign accession indices */
-			while((index1 = facc_index(label1)) < 0)
-				facc[g_nent++] = char_string(label1);
-			while((index2 = facc_index(label2)) < 0)
-				facc[g_nent++] = char_string(label2);
+			parsed++;
+			if (subset && ((index1 = facc_index(label1)) < 0 || (index2 = facc_index(label2)) < 0)) {
+				skipped++;
+				continue;
+			} else {
+				included++;
+				while((index1 = facc_index(label1)) < 0)
+					facc[g_nent++] = char_string(label1);
+				while((index2 = facc_index(label2)) < 0)
+					facc[g_nent++] = char_string(label2);
+			}
 			if (p_v)
-			fprintf(stderr, "first g_nent %d label1 %s index %d label2 %s index %d pctid %g sdist %g\n",
-				g_nent, label1, facc_index(label1), label2, facc_index(label2), pctid, sdist);
+				fprintf(stderr, "parsed %d skipped %d included %d : g_nent %d label1 %s index %d label2 %s index %d pctid %g sdist %g\n",
+					parsed, skipped, included,
+					g_nent, label1, facc_index(label1), label2, facc_index(label2), pctid, sdist);
 			tmp_imx[index1][index2] = tmp_imx[index2][index1] = 100.0 * pctid;
 			tmp_dmx[index1][index2] = tmp_dmx[index2][index1] = sdist;
 		}
 		fclose(fp);
 		g_nsrc++;
 	}
-	fprintf(stderr, "Read_alignfastas defined %d labels in %d sources\n", g_nent, g_nsrc);
+	fprintf(stderr, "Read_alignfastas %d labels, %d alignfastafiles, %d parsed %d skipped %d included\n",
+			g_nent, g_nsrc, parsed, skipped, included);
 	/* allocate global distance and percent identity matrices */
 	if ((global_dmx = double_matrix(g_nent, g_nent)) == NULL)
 		fprintf(stderr, "could not allocate global_dmx double_matrix %d x %d\n", g_nent, g_nent), exit(1);
