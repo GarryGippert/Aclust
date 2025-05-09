@@ -211,8 +211,9 @@ int p_metadata = 1;		/* print tree node metadata */
 char p_e = 'D';			/* 'D' = distance tree, 'S' = (plus) single embed tree, 'F' = (plus) full recursive embed tree */
 int p_dave = 0;			/* distance averaging flag 0=branch distances, 1=leaf distances */
 
-char *scorematrixfile = NULL;
-char *f_dmxfilename = NULL;
+char *f_scorematrixfile = NULL;
+char *f_distancefile = NULL;
+char *f_accessionsfile = NULL;
 char *oprefix = NULL;
 
 FILE *jsnfp = NULL;		/* file pointer for writing alignment JSON line-by-line */
@@ -2651,15 +2652,21 @@ int pparse(int argc, char *argv[])
 		else if (strncmp(argv[c], "-dmx", 4) == 0) {
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
-			f_dmxfilename = char_string(argv[c++]);
-			fprintf(stderr, "f_dmxfilename set to '%s'\n", f_dmxfilename);
+			f_distancefile = char_string(argv[c++]);
+			fprintf(stderr, "f_distancefile set to '%s'\n", f_distancefile);
 		}
 
+		else if (strncmp(argv[c], "-acc", 4) == 0) {
+			if (++c == argc)
+				parameter_value_missing(c, argc, argv);
+			f_accessionsfile = char_string(argv[c++]);
+			fprintf(stderr, "accessions file set to '%s'\n", f_accessionsfile);
+		}
 		else if (strncmp(argv[c], "-s", 2) == 0) {
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
-			scorematrixfile = char_string(argv[c++]);
-			fprintf(stderr, "scorematrix file set to '%s'\n", scorematrixfile);
+			f_scorematrixfile = char_string(argv[c++]);
+			fprintf(stderr, "scorematrix file set to '%s'\n", f_scorematrixfile);
 		}
 		else if (strncmp(argv[c], "-p", 2) == 0) {
 			if (++c == argc)
@@ -2764,9 +2771,10 @@ int pparse(int argc, char *argv[])
 	fprintf(stderr, "Input parameters:\n");
 	fprintf(stderr, " -msa		multiple sequence alignment input (%d)\n", p_msa);
 	fprintf(stderr, " -alf		alignfastas input (%d)\n", p_alf);
-	fprintf(stderr, " -dmx %s	distance matrix input (filename)\n", f_dmxfilename);
+	fprintf(stderr, " -dmx %s	distance matrix input (filename)\n", f_distancefile);
+	fprintf(stderr, " -acc %s	accessions input (filename) for subsets of alignfastas\n", f_accessionsfile);
 	fprintf(stderr, "Alignment parameters:\n");
-	fprintf(stderr, " -s %s	substitution score matrix (filename)\n", scorematrixfile);
+	fprintf(stderr, " -s %s	substitution score matrix (filename)\n", f_scorematrixfile);
 	fprintf(stderr, " -nonself	nonself alignments (%d)\n", p_nonself);
 	fprintf(stderr, " -go %-8g	(double) value of affine gap open penalty\n", p_go);
 	fprintf(stderr, " -ge %-8g	(double) value of affine gap extension penalty\n", p_ge);
@@ -2824,15 +2832,27 @@ int facc_index(char *word)
 /* remember MAXENTRIES 10000 int g_nent = 0; char *facc[MAXENTRIES]; */
 
 void read_alf(int argc, char *argv[], int cstart)
-	/* Read input from alignfastas output files */
+/* read ALIGNFASTAS file by file, line by line, parse into global dmx and imx matrices */
 {
-	fprintf(stderr, "%s Trying to read alignfastas file(s) start %d of %d\n", argv[0], cstart, argc);
+	/* reset values of global counters and matrices altered by this subroutine */
 	g_nsrc = g_nent = 0;
-	char line[MAXLINELEN], word1[MAXWORDLEN], word2[MAXWORDLEN];
-	double alnid, sdmin;
-	FILE *fp;
-	int c, index1, index2;
 	global_dmx = global_imx = NULL;
+
+	char line[MAXLINELEN], label1[MAXWORDLEN], label2[MAXWORDLEN];
+	FILE *fp;
+	int c, index1, index2, i, j;
+	double pctid, sdist, **tmp_dmx = NULL, **tmp_imx = NULL;
+	/* allocate tmp matrices for pairwise distance, which is used in tree building,
+	   and pairwise alignment percent identity which is used later in tree branch metadata.
+	   and fill them with -99.9 meaning undefined value.  */
+	if ((tmp_dmx = double_matrix(MAXENTRIES, MAXENTRIES)) == NULL)
+		fprintf(stderr, "could not allocate tmp_dmx double_matrix %d x %d\n", MAXENTRIES, MAXENTRIES), exit(1);
+	if ((tmp_imx = double_matrix(MAXENTRIES, MAXENTRIES)) == NULL)
+		fprintf(stderr, "could not allocate tmp_imx double_matrix %d x %d\n", MAXENTRIES, MAXENTRIES), exit(1);
+	/* initialize tmp matrices to -99.9, to test later for undefined elements */
+	for (i = 0; i < g_nent; i++)
+	for (j = 0; j < g_nent; j++)
+		global_dmx[i][j] = global_imx[i][j] = -99.0;
 	for (c = cstart; c < argc; c++) {
 		fprintf(stderr, " argv[%d], %s\n", c, argv[c]);
 		if ((fp = fopen(argv[c], "r")) == NULL)
@@ -2840,59 +2860,45 @@ void read_alf(int argc, char *argv[], int cstart)
 		while (fgets(line, sizeof(line), fp) != NULL) {
 			if (strlen(line) == 0 || line[0] == '#')
 				continue;
-			/*
-			 * >>00x00 cazy19791-Pyrobaculum_aerophilum-GT66    785 cazy19791-Pyrobaculum_aerophilum-GT66    785    785    785    785    785      0      0    785    785 1        4079   4079 1092.29 1092.29 1575.84 1575.84 86.8018     15   4079   4079   -785     -0     -0     -0     -0
-			 */
-
 			if (sscanf(line, "%*s %s %*d %s %*d %*d %*d %*d %*d %*d %*d %*d %*d %lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %lf",
-				word1, word2, &alnid, &sdmin) != 4)
-				fprintf(stderr, "Could not sscanf word1, word2, alnid, sdmin from line >>%s<<\n", line), exit(1);
+				label1, label2, &pctid, &sdist) != 4)
+				fprintf(stderr, "Could not sscanf label1, label2, pctid, sdist from line >>%s<<\n", line), exit(1);
 			/* return or assign accession indices */
-			while((index1 = facc_index(word1)) < 0)
-				facc[g_nent++] = char_string(word1);
-			while((index2 = facc_index(word2)) < 0)
-				facc[g_nent++] = char_string(word2);
+			while((index1 = facc_index(label1)) < 0)
+				facc[g_nent++] = char_string(label1);
+			while((index2 = facc_index(label2)) < 0)
+				facc[g_nent++] = char_string(label2);
 			if (p_v)
-			fprintf(stderr, "first g_nent %d word1 %s index %d word2 %s index %d alnid %g sdmin %g\n",
-				g_nent, word1, facc_index(word1), word2, facc_index(word2), alnid, sdmin);
+			fprintf(stderr, "first g_nent %d label1 %s index %d label2 %s index %d pctid %g sdist %g\n",
+				g_nent, label1, facc_index(label1), label2, facc_index(label2), pctid, sdist);
+			global_imx[index1][index2] = global_imx[index2][index1] = 100.0 * pctid;
+			global_dmx[index1][index2] = global_dmx[index2][index1] = sdist;
 		}
 		fclose(fp);
 		g_nsrc++;
 	}
-	fprintf(stderr, "Defined %d entries in %d sources\n", g_nent, g_nsrc);
-
+	fprintf(stderr, "Read_alignfastas defined %d labels in %d sources\n", g_nent, g_nsrc);
 	/* allocate global distance and percent identity matrices */
-	global_dmx = double_matrix(g_nent, g_nent);
-	global_imx = double_matrix(g_nent, g_nent);
-	int i, j;
+	if ((global_dmx = double_matrix(g_nent, g_nent)) == NULL)
+		fprintf(stderr, "could not allocate global_dmx double_matrix %d x %d\n", g_nent, g_nent), exit(1);
+	if ((global_imx = double_matrix(g_nent, g_nent)) == NULL)
+		fprintf(stderr, "could not allocate global_imx double_matrix %d x %d\n", g_nent, g_nent), exit(1);
+	/* fill in global matrices from tmp matrices, and test for undefined values */
+	int undefined = 0;
 	for (i = 0; i < g_nent; i++)
-		for (j = i;  j < g_nent; j++)
-			global_dmx[i][j] = global_dmx[j][i] = global_imx[i][j] = global_imx[j][i] = -99.0;
-
-	/* Reopen the file and rescan the data. Simply faster than recording it the first time */
-	for (c = cstart; c < argc; c++) {
-		fprintf(stderr, " argv[%d], %s\n", c, argv[c]);
-		if ((fp = fopen(argv[c], "r")) == NULL)
-			fprintf(stderr, "Could not open filename %s r mode\n", argv[c]), exit(1);
-		while (fgets(line, sizeof(line), fp) != NULL) {
-			if (strlen(line) == 0 || line[0] == '#')
-				continue;
-			if (sscanf(line, "%*s %s %*d %s %*d %*d %*d %*d %*d %*d %*d %*d %*d %lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %lf",
-				word1, word2, &alnid, &sdmin) != 4)
-				fprintf(stderr, "Could not sscanf word1, word2, alnid, sdmin from line >>%s<<\n", line), exit(1);
-			/* retrieve accession indices */
-			if((index1 = facc_index(word1)) < 0)
-				fprintf(stderr, "Unexpected that word >>%s<< is not on facc list g_nent %d\n", word1, g_nent), exit(1);
-			if((index2 = facc_index(word2)) < 0)
-				fprintf(stderr, "Unexpected that word >>%s<< is not on facc list g_nent %d\n", word2, g_nent), exit(1);
-			if (p_v)
-			fprintf(stderr, "second g_nent %d word1 %s index %d word2 %s index %d alnid %g sdmin %g\n",
-				g_nent, word1, facc_index(word1), word2, facc_index(word2), alnid, sdmin);
-			global_imx[index1][index2] = global_imx[index2][index1] = 100.0 * alnid;
-			global_dmx[index1][index2] = global_dmx[index2][index1] = sdmin;
+	for (j = 0; j < g_nent; j++) {
+		global_dmx[i][j] = tmp_dmx[i][j];
+		global_imx[i][j] = tmp_imx[i][j];
+		if (global_dmx[i][j] < -0.0) {
+			fprintf(stderr, "labels %s %s dmx[ %d ][ %d ] < -0.0 %lf\n",
+				facc[i], facc[j], i, j, global_dmx[i][j]);
+			undefined += 1;
 		}
-		fclose(fp);
 	}
+	if (undefined)
+		fprintf(stderr, "Undefined distance matrix elements, program halted.\n"), exit(1);
+	double_matrix_free(MAXENTRIES, MAXENTRIES, tmp_dmx);
+	double_matrix_free(MAXENTRIES, MAXENTRIES, tmp_imx);
 	fprintf(stderr, "Read %d indices from %d source files\n", g_nent, g_nsrc);
 }
 
@@ -2969,9 +2975,9 @@ int main(int argc, char *argv[])
 
 	double **dmx = NULL;
 
-	if (f_dmxfilename != NULL) {
+	if (f_distancefile != NULL) {
 		/* read dmx from a file */
-		read_dmx(f_dmxfilename);
+		read_dmx(f_distancefile);
 	}
 	else if (p_alf) {
 		/* read dmx from alignfasta file(s) */
@@ -2980,9 +2986,9 @@ int main(int argc, char *argv[])
 	}
 	else {
 		/* compute dmx from computed or interpolated pairwise alignments */
-		if (!scorematrixfile)
-			scorematrixfile = char_string(DEFAULT_SCORE_MATRIX);
-		read_scorematrix(scorematrixfile);
+		if (!f_scorematrixfile)
+			f_scorematrixfile = char_string(DEFAULT_SCORE_MATRIX);
+		read_scorematrix(f_scorematrixfile);
 		read_fasta_files(argc, argv, c);
 		align_fasta();
 		write_dmx(oprefix);
