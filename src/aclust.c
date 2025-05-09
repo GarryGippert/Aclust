@@ -2871,8 +2871,8 @@ void read_alf(int argc, char *argv[], int cstart)
 			if (p_v)
 			fprintf(stderr, "first g_nent %d label1 %s index %d label2 %s index %d pctid %g sdist %g\n",
 				g_nent, label1, facc_index(label1), label2, facc_index(label2), pctid, sdist);
-			global_imx[index1][index2] = global_imx[index2][index1] = 100.0 * pctid;
-			global_dmx[index1][index2] = global_dmx[index2][index1] = sdist;
+			tmp_imx[index1][index2] = tmp_imx[index2][index1] = 100.0 * pctid;
+			tmp_dmx[index1][index2] = tmp_dmx[index2][index1] = sdist;
 		}
 		fclose(fp);
 		g_nsrc++;
