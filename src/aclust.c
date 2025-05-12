@@ -204,6 +204,7 @@ int p_msa = 0;			/* multiple sequence alignment input (FASTA only) */
 int p_alf = 0;			/* alignfastas input (and not Fasta files) */
 int p_jaln = 0;			/* write alignments as JSON */
 int p_taln = 0;			/* write alignment as text */
+int p_wdmx = 0;			/* write dmx file as text */
 int p_nonself = 0;		/* do not align with self (show only off-diagonal elements */
 int p_metadata = 1;		/* print tree node metadata */
 
@@ -2752,6 +2753,11 @@ int pparse(int argc, char *argv[])
 			p_taln = (p_taln + 1)%2;
 			fprintf(stderr, "Write align text %d\n", p_taln);
 		}
+		else if (strncmp(argv[c], "-wdmx", 5) == 0) {
+			++c;
+			p_wdmx = (p_wdmx + 1)%2;
+			fprintf(stderr, "Write distance matrix text %d\n", p_wdmx);
+		}
 		else if (strncmp(argv[c], "-v", 2) == 0) {
 			++c;
 			p_v++;
@@ -3018,7 +3024,8 @@ int main(int argc, char *argv[])
 	else if (p_alf) {
 		/* read dmx from alignfasta file(s) */
 		read_alf(argc, argv, c);
-		write_dmx(oprefix);
+		if (p_wdmx)
+			write_dmx(oprefix);
 	}
 	else {
 		/* compute dmx from computed or interpolated pairwise alignments */
@@ -3027,7 +3034,8 @@ int main(int argc, char *argv[])
 		read_scorematrix(f_scorematrixfile);
 		read_fasta_files(argc, argv, c);
 		align_fasta();
-		write_dmx(oprefix);
+		if (p_wdmx)
+			write_dmx(oprefix);
 	}
 	/* test the distance matrix for 'holes' */
 	fprintf(stderr, "Got DMX with %d entries, scanning for possible holes...\n", g_nent);
