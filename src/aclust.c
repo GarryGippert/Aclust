@@ -126,9 +126,9 @@ ACLUST was developed and written by Garry Paul Gippert, and packaged as a single
 
 This code is still under development.
 
-Global variables generally have g_ prefix. 
+Global variables generally have prefix g_. 
 
-Command line paremeters and other program parameters generally have p_ as prefix.
+Command line and other program parameters and flags generally have prefix p_.
 
 Garry P G. April 9, 2025.
 
@@ -3102,11 +3102,13 @@ void read_alf(int argc, char *argv[], int cstart)
 	}
 	fprintf(stderr, "Read_alignfastas %d labels, lines parsed %d, skipped %d, included %d\n",
 			g_index, parsed, skipped, included);
+
 	/* allocate global distance and percent identity matrices */
 	if ((global_dmx = double_matrix(g_index, g_index)) == NULL)
 		fprintf(stderr, "could not allocate global_dmx double_matrix %d x %d\n", g_index, g_index), exit(1);
 	if ((global_imx = double_matrix(g_index, g_index)) == NULL)
 		fprintf(stderr, "could not allocate global_imx double_matrix %d x %d\n", g_index, g_index), exit(1);
+
 	/* fill in global matrices from tmp matrices, and test for undefined values */
 	int undefined = 0;
 	for (i = 0; i < g_index; i++)
