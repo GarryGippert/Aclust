@@ -126,7 +126,7 @@ ACLUST was developed and written by Garry Paul Gippert, and packaged as a single
 
 This code is still under development.
 
-Global variables generally have prefix g_. 
+Global variables generally have prefix g_.
 
 Command line and other program parameters and flags generally have prefix p_.
 
@@ -148,30 +148,30 @@ Garry P G. April 9, 2025.
 #include "version.txt"
 
 int clocktime(int prev)
-/* return seconds (clock time) since prev */
 {
-        time_t t;
-        t = time(NULL);
-        return (t - prev);
+/* return seconds (clock time) since prev */
+	time_t t;
+	t = time(NULL);
+	return (t - prev);
 }
 
 float elapsed(float stime)
-/* return seconds (CPU time) since stime */
 {
-        struct tms buffer;
-        float f, hz_;
-        times(&buffer);
-        f = buffer.tms_utime + buffer.tms_stime;
+/* return seconds (CPU time) since stime */
+	struct tms buffer;
+	float f, hz_;
+	times(&buffer);
+	f = buffer.tms_utime + buffer.tms_stime;
 #if defined(_SC_CLK_TCK)
-        hz_ = sysconf(_SC_CLK_TCK);
+	hz_ = sysconf(_SC_CLK_TCK);
 #else
-        hz_ = HZ;
+	hz_ = HZ;
 #endif
-        f /= hz_;
-        f -= stime;
-        if (f <= 0.0)
-                return (0.0);
-        return (f);
+	f /= hz_;
+	f -= stime;
+	if (f <= 0.0)
+		return (0.0);
+	return (f);
 }
 
 #define MAXSEQUENCELEN 10000
@@ -209,7 +209,8 @@ int p_nonself = 0;		/* do not align with self (show only off-diagonal elements *
 int p_metadata = 1;		/* print tree node metadata */
 
 /* Treebuilding */
-char p_e = 'D';			/* 'D' = distance tree, 'S' = (plus) single embed tree, 'F' = (plus) full recursive embed tree */
+char p_e = 'D';			/* 'D' = distance tree, 'S' = (plus) single embed tree, 'F' = (plus) full recursive
+				embed tree */
 int p_dave = 0;			/* distance averaging flag 0=branch distances, 1=leaf distances */
 
 char *f_scorematrixfile = NULL;
@@ -221,8 +222,8 @@ FILE *jsnfp = NULL;		/* file pointer for writing alignment JSON line-by-line */
 FILE *alnfp = NULL;		/* file pointer for writing alignment free text */
 
 void j_opn(FILE * fp)
-/* open json line */
 {
+/* open json line */
 #ifdef JSONLONG
 	fprintf(fp, "[");
 #else
@@ -231,15 +232,15 @@ void j_opn(FILE * fp)
 }
 
 void j_cmt(FILE * fp, char *comment)
-/* output jsonified comment */
 {
+/* output jsonified comment */
 	if (comment)
 		fprintf(fp, ", \"comment\": \"%s\"", comment);
 }
 
 void j_url(FILE * fp, char *url)
-/* output jsonified url */
 {
+/* output jsonified url */
 	if (url)
 		fprintf(fp, ", \"url\": \"%s\"", url);
 }
@@ -248,8 +249,8 @@ void j_url(FILE * fp, char *url)
 #define YES 1
 
 void j_int(FILE * fp, int comma, char *key, int value, char *comment, char *url)
-/* output jsonified integer */
 {
+/* output jsonified integer */
 #ifdef JSONLONG
 	fprintf(fp, "{\"key\": \"%s\", \"value\": %d", key, value);
 	j_cmt(fp, comment);
@@ -263,8 +264,8 @@ void j_int(FILE * fp, int comma, char *key, int value, char *comment, char *url)
 }
 
 void j_str(FILE * fp, int comma, char *key, char *value, char *comment, char *url)
-/* output jsonified string */
 {
+/* output jsonified string */
 #ifdef JSONLONG
 	fprintf(fp, "{\"key\": \"%s\", \"value\": \"%s\"", key, value);
 	j_cmt(fp, comment);
@@ -278,8 +279,8 @@ void j_str(FILE * fp, int comma, char *key, char *value, char *comment, char *ur
 }
 
 void j_dbl(FILE * fp, int comma, char *key, double value, char *comment, char *url)
-/* output jsonified string */
 {
+/* output jsonified string */
 #ifdef JSONLONG
 	fprintf(fp, "{\"key\": \"%s\", \"value\": %g", key, value);
 	j_cmt(fp, comment);
@@ -293,8 +294,8 @@ void j_dbl(FILE * fp, int comma, char *key, double value, char *comment, char *u
 }
 
 void j_cls(FILE * fp)
-/* close JSON line */
 {
+/* close JSON line */
 #ifdef JSONLONG
 	fprintf(fp, "]\n");
 #else
@@ -303,8 +304,8 @@ void j_cls(FILE * fp)
 }
 
 double *double_vector(int n)
-/* return double * vector of length n*/
 {
+/* return double * vector of length n*/
 	double *v;
 	int i;
 	if ((v = (double *)malloc(n * sizeof(double))) == NULL)
@@ -315,24 +316,24 @@ double *double_vector(int n)
 }
 
 double *double_vector_copy(int n, double *u)
-/* return copy of double * vector */
 {
+/* return copy of double * vector */
 	double *v = double_vector(n);
 	memcpy(v, u, n * sizeof(double));
 	return (v);
 }
 
 extern void double_vector_drand48(int n, double *v, double lower, double upper)
-/* assign double *vector random values in range lower to upper */
 {
+/* assign double *vector random values in range lower to upper */
 	int i;
 	for (i = 0; i < n; i++)
 		v[i] = lower + (upper - lower) * drand48();
 }
 
 extern void double_vector_normal(int n, double *v)
-/* normalize double * vector to unit length */
 {
+/* normalize double * vector to unit length */
 	double s = 0.0;
 	int i;
 	for (i = 0; i < n; i++)
@@ -343,17 +344,17 @@ extern void double_vector_normal(int n, double *v)
 }
 
 void double_vector_free(int n, double *v)
-/* free double * vector */
 {
+/* free double * vector */
 	if (v)
 		free((char *)v);
 	v = NULL;
 }
 
 double **double_matrix(int ni, int nj)
+{
 /* return double ** matrix having dimensions ni * nj
 // but leave second dimension unallocated if nj <= 0 */
-{
 	double **m;
 	int i, j;
 	if ((m = (double **)malloc(ni * sizeof(double *))) == NULL)
@@ -370,8 +371,8 @@ double **double_matrix(int ni, int nj)
 }
 
 void double_matrix_free(int ni, int nj, double **m)
-/* free double ** matrix */
 {
+/* free double ** matrix */
 	int i;
 	for (i = 0; i < ni; i++)
 		double_vector_free(nj, m[i]);
@@ -380,8 +381,8 @@ void double_matrix_free(int ni, int nj, double **m)
 }
 
 void double_matrix_print(int ni, int nj, double **m, char **lab)
-/* print double ** matrix, with optional labels */
 {
+/* print double ** matrix, with optional labels */
 	int i, j;
 	int print_half = 1;
 	for (i = 0; i < ni; i++) {
@@ -413,9 +414,9 @@ char *string_copy(char *str)
 }
 
 char **char_matrix(int ni, int nj)
+{
 /* return char ** matrix having dimensions ni * nj
 // but leave second dimension unallocated if nj <= 0 */
-{
 	char **m;
 	int i, j;
 	if ((m = (char **)malloc(ni * sizeof(char *))) == NULL)
@@ -467,9 +468,9 @@ void int_vector_free(int n, int *v)
 }
 
 int **int_matrix(int ni, int nj)
+{
 /* allocate integer matrix having dimensions ni * nj
 // but leave second dimension unallocated if nj <= 0 */
-{
 	int **m;
 	int i, j;
 	if ((m = (int **)malloc(ni * sizeof(int *))) == NULL)
@@ -502,17 +503,18 @@ int nb = 0;
 char alphabet[MAXN];
 
 double blosum_zscore(double mscore, int mlen)
+{
 /* Compute Blosum62 Zscore from average random Blosum score = -mlen, and stddev score = 2 n^0.5,
 	for gapless fragments, unclear to use ascore or mscore */
-{
-        if (mlen <= 0) 
-                return (-99.9); 
-        return ((mscore + (double) mlen) / (2.0 * sqrt((double) mlen)));
+	if (mlen <= 0)
+		return (-99.9);
+	return ((mscore + (double)mlen) / (2.0 * sqrt((double)mlen)));
 }
 
 static int print_blosum_pscore_parameters = 0;
 
 double blosum_pscore(double zscore, int qlen)
+{
 /* Pscore = -log10(Pvalue). from extreme value distrubution.
    Probability of Zscore P(z)
         P(z) = exp[(A-z)/B - exp[(A-z)/B]]/B
@@ -524,43 +526,42 @@ double blosum_pscore(double zscore, int qlen)
    We put this in -log10 units.
    LARGER PSCORE IS BETTER.  GPG 040614
 */
-{
-        if (qlen < 0)
-                return 0.0;
+	if (qlen < 0)
+		return 0.0;
 
 	/* Extreme value distribution constants to three sig figs */
 #define EVD_A_CONST 3.30
 #define EVD_A_SLOPE 0.387
 #define EVD_B_CONST 0.393
 #define EVD_B_SLOPE 0.0585
-        double A = EVD_A_CONST + EVD_A_SLOPE * log((double) qlen);
-        double B = EVD_B_CONST + EVD_B_SLOPE * log((double) qlen);
-        double P = exp((A - zscore) / B - exp((A - zscore) / B)) / B;
-        double D = exp(-exp((A - zscore) / B));
+	double A = EVD_A_CONST + EVD_A_SLOPE * log((double)qlen);
+	double B = EVD_B_CONST + EVD_B_SLOPE * log((double)qlen);
+	double P = exp((A - zscore) / B - exp((A - zscore) / B)) / B;
+	double D = exp(-exp((A - zscore) / B));
 
-        /* limit of pscore resolution */
+	/* limit of pscore resolution */
 #define PSCORE_LIMIT 1.0e-15
-        double f = 1.0 - D;
-        f = (f > PSCORE_LIMIT ? f : PSCORE_LIMIT);
-        double S = -log10(f);
+	double f = 1.0 - D;
+	f = (f > PSCORE_LIMIT ? f : PSCORE_LIMIT);
+	double S = -log10(f);
 #ifdef DEBUG
-        printf("# blosum_pscore Z %f Q %d A %g B %g P %g D %g => S %g\n",
-               zscore, qlen, A, B, P, D, S);
+	printf("# blosum_pscore Z %f Q %d A %g B %g P %g D %g => S %g\n",
+	       zscore, qlen, A, B, P, D, S);
 #endif
 
-        /* print parameters once */
-        if (!print_blosum_pscore_parameters) {
-                fprintf(stderr, "Blosum PSCORE parameters:\n");
-                fprintf(stderr, " Q = %d\n", qlen);
-                fprintf(stderr, " A = EVD_A_CONST %g + EVD_A_SLOPE %g * log(Q) = %g\n", EVD_A_CONST, EVD_A_SLOPE, A);
-                fprintf(stderr, " B = EVD_B_CONST %g + EVD_B_SLOPE %g * log(Q) = %g\n", EVD_B_CONST, EVD_B_SLOPE, B);
-                fprintf(stderr, " Z = %g\n", zscore);
-                fprintf(stderr, " P = exp((A - Z)/B - exp((A - Z)/B))/B = %g\n", P);
-                fprintf(stderr, " D = exp(-exp((A - Z)/B)) = %g\n", D);
-                fprintf(stderr, " S = -log10(1.0 - D) = %g (blosum pscore)\n", S);
-                print_blosum_pscore_parameters++;
-        }
-        return (S);
+	/* print parameters once */
+	if (!print_blosum_pscore_parameters) {
+		fprintf(stderr, "Blosum PSCORE parameters:\n");
+		fprintf(stderr, " Q = %d\n", qlen);
+		fprintf(stderr, " A = EVD_A_CONST %g + EVD_A_SLOPE %g * log(Q) = %g\n", EVD_A_CONST, EVD_A_SLOPE, A);
+		fprintf(stderr, " B = EVD_B_CONST %g + EVD_B_SLOPE %g * log(Q) = %g\n", EVD_B_CONST, EVD_B_SLOPE, B);
+		fprintf(stderr, " Z = %g\n", zscore);
+		fprintf(stderr, " P = exp((A - Z)/B - exp((A - Z)/B))/B = %g\n", P);
+		fprintf(stderr, " D = exp(-exp((A - Z)/B)) = %g\n", D);
+		fprintf(stderr, " S = -log10(1.0 - D) = %g (blosum pscore)\n", S);
+		print_blosum_pscore_parameters++;
+	}
+	return (S);
 }
 
 static double g_lambda = 0.267000;
@@ -568,17 +569,17 @@ static double g_kappa = 0.041000;
 
 double natscore(double score)
 {
-        return (score * g_lambda - log(g_kappa));
-}               
-                        
+	return (score * g_lambda - log(g_kappa));
+}
+
 double bitscore(double score)
 {
-        return (natscore(score) / log(2.0));
-} 
+	return (natscore(score) / log(2.0));
+}
 
 int apos(char c)
-/* return index of character c in scorematrix alphabet */
 {
+/* return index of character c in scorematrix alphabet */
 	char *l = strchr(alphabet, c);
 	if (!l)
 		fprintf(stderr, "Could not find char '%c' in alphabet '%s'\n", c, alphabet), exit(1);
@@ -587,8 +588,8 @@ int apos(char c)
 
 #define UNDEFINED_SCOREMATRIX_VALUE 999.9
 double scorematrix_element(char a, char b)
-/* return scorematrix matrix element for characters a, b */
 {
+/* return scorematrix matrix element for characters a, b */
 	/* ignore pad positions (outside of the local alignment) */
 	if (a == ALIGN_PAD_CHAR || b == ALIGN_PAD_CHAR) {
 		if (p_v)
@@ -636,10 +637,10 @@ void print_scorematrix()
 }
 
 void read_scorematrix(char *filename)
+{
 /* READ BLOSUM62 amino-acid substitution score matrix, and alphabet from a file
 // in the very specific format provided with this source code.
 // allocates and assigned global variables blosum_mtx, nb and alphabet */
-{
 	char line[MAXLINELEN], text[MAXLINELEN];
 	int lineno = 0;
 	FILE *fp;
@@ -767,7 +768,7 @@ void dnode_traverse(char *w, DNODE * p, int n)
 	char c;
 	for (c = MINCHAR; c <= MAXCHAR; c++) {
 		if (p->s[c]) {
-			if (p_v>1)
+			if (p_v > 1)
 				printf("calling dnode traverse %s+'%c' %d\n", w, c, n + 1);
 			dnode_traverse(w, p->s[c], n + 1);
 		}
@@ -793,7 +794,7 @@ void dnode_traverse(char *w, DNODE * p, int n)
 
 void showdict()
 {
-	char c, w[2028]; /* should be dimensioned to longest word in the dictionary */
+	char c, w[2028];	/* should be dimensioned to longest word in the dictionary */
 	nword = nterm = 0;
 	for (c = MINCHAR; c <= MAXCHAR; c++)
 		dnode_traverse(w, droot->s[c], 0);
@@ -816,13 +817,13 @@ DNODE *dnode_srch(DNODE * prev, char *word, int l, int n)
 }
 
 DNODE *dnode_locate(char *label)
-	/* locate and return DNODE or NULL */
 {
+	/* locate and return DNODE or NULL */
 	return dnode_srch(droot, label, strlen(label), 0);
 }
 
 #define MAXENTRIES 10000
-int g_index = 0; /*  global count of sequence labels must not exceed MAXENTRIES */
+int g_index = 0;		/* global count of sequence labels must not exceed MAXENTRIES */
 char *flab[MAXENTRIES];
 char *fseq[MAXENTRIES];
 /* int  *frti[MAXENTRIES]; residue index deactivated */
@@ -837,7 +838,7 @@ DNODE *dnode_add(char *label, char *seq, int index)
 {
 	if (index >= MAXENTRIES)
 		fprintf(stderr, "Cannot create more than MAXENTRIES labels\n"), exit(1);
-	if (! droot)
+	if (!droot)
 		droot = dnode_alloc();
 	DNODE *p, *new;
 	int i, na, n = strlen(label);
@@ -890,8 +891,8 @@ DNODE *dnode_add(char *label, char *seq, int index)
 }
 
 DNODE *dnode_create(char *label, char *seq)
-	/* create and return DNODE, but error if it already exists */
 {
+	/* create and return DNODE, but error if it already exists */
 	DNODE *d = dnode_srch(droot, label, strlen(label), 0);
 	if (d)
 		fprintf(stderr, "Should not create an existing node label %s\n", label), exit(1);
@@ -900,12 +901,12 @@ DNODE *dnode_create(char *label, char *seq)
 }
 
 DNODE *dnode_locate_or_create(char *label, char *seq)
-	/* locate or create and return DNODE */
 {
+	/* locate or create and return DNODE */
 	DNODE *d = dnode_srch(droot, label, strlen(label), 0);
-	if (! d)
+	if (!d)
 		d = dnode_add(label, seq, g_index++);
-	if (! d)
+	if (!d)
 		fprintf(stderr, "dnode_add returns NULL for label %s seq %s\n",
 			label, (seq ? seq : "undefined")), exit(1);
 	return d;
@@ -931,8 +932,8 @@ char line[MAXLINELEN], text[MAXLINELEN], acc[MAXLINELEN], seq[MAXSEQUENCELEN];
 */
 
 void read_fasta(char *filename)
-	/* read sequence fasta file */
 {
+	/* read sequence fasta file */
 	DNODE *d;
 	FILE *fp;
 	if ((fp = fopen(filename, "r")) == NULL)
@@ -983,11 +984,11 @@ double **global_score_matrix = NULL, **global_match_matrix = NULL;
 int global_seqlen = 0;
 
 void pair_score_matrix(int f1, int f2)
-/* provide Blosum62 substitution score matrix for pair of fasta elements fi, fj */
 {
+/* provide Blosum62 substitution score matrix for pair of fasta elements fi, fj */
 	char *s1 = fseq[f1], *s2 = fseq[f2];
 	int i, j, n1 = strlen(s1), n2 = strlen(s2);
-	if (n1 > global_seqlen || n2 > global_seqlen){
+	if (n1 > global_seqlen || n2 > global_seqlen) {
 		if (global_score_matrix) {
 			double_matrix_free(global_seqlen + 1, global_seqlen + 1, global_score_matrix);
 			double_matrix_free(global_seqlen, global_seqlen, global_match_matrix);
@@ -1011,10 +1012,10 @@ double **global_T = NULL, **global_U = NULL, **global_V = NULL;
 int global_N = 0;
 
 double align_score(char *s1, char *s2, int n1, int n2, double **S, double **M, double fg, double ng, int *o1, int *o2, int align_flag)
+{
 /* Generate optimal local (Smith & Waterman 1981) alignment path using affine gap penalties
  * including an unpublished crossover gap allowance (Gippert 2001). Return alignment score
  * and (indirectly) sequence offsets. */
-{
 	int i, j;
 	double ascore = 0.0;
 	*o1 = -1;
@@ -1030,8 +1031,9 @@ double align_score(char *s1, char *s2, int n1, int n2, double **S, double **M, d
 		global_T = double_matrix(global_N + 1, global_N + 1);
 		global_U = double_matrix(global_N + 1, global_N + 1);
 		global_V = double_matrix(global_N + 1, global_N + 1);
-	} else {
-		for(i = 0; i <= global_N; i++)
+	}
+	else {
+		for (i = 0; i <= global_N; i++)
 			for (j = 0; j <= global_N; j++)
 				global_T[i][j] = global_U[i][j] = global_V[i][j] = 0.0;
 	}
@@ -1108,17 +1110,19 @@ double align_score(char *s1, char *s2, int n1, int n2, double **S, double **M, d
 /* ALN structure */
 typedef struct aln {
 	struct aln *next;
-	char *name1, *name2, *seq1, *seq2, *aln1, *aln2;	/* accession, sequence string and alignment string of each pair */
-	int len1, len2, start1, start2, end1, end2;		/* sequence lengths and start/end coordinates (1-based) */
+	char *name1, *name2, *seq1, *seq2, *aln1, *aln2;	/* accession, sequence string and alignment string of
+								each pair */
+	int len1, len2, start1, start2, end1, end2;	/* sequence lengths and start/end coordinates (1-based) */
 	int plen, alen, mlen, ilen, glen, olen, clen, nlen;	/* counts related to alignment */
-	double gapcost, ascore, mscore, aprime, mprime, ab, mb, mscore1, mscore2, mscorer, sd0, sd1, sd2, sd;	/* properties of the alignment */
-	double zscore, pscore;					/* related to CE alignments */
-	double score, evalue, bitscore;				/* related to BLAST alignemnts */
+	double gapcost, ascore, mscore, aprime, mprime, ab, mb, mscore1, mscore2, mscorer, sd0, sd1, sd2, sd;	/* properties of the
+														alignment */
+	double zscore, pscore;	/* related to CE alignments */
+	double score, evalue, bitscore;	/* related to BLAST alignemnts */
 } ALN;
 
 ALN *aln_alloc()
-/* return an allocated but empty ALN object */
 {
+/* return an allocated but empty ALN object */
 	ALN *A = NULL;
 	if ((A = (ALN *) malloc(sizeof(ALN))) == NULL)
 		fprintf(stderr, "Could not allocate ALN object\n"), exit(1);
@@ -1131,39 +1135,51 @@ ALN *aln_alloc()
 	return (A);
 }
 
-void aln_free(ALN *A)
-/* recursively call memory free of alignment object or list */
+void aln_free(ALN * A)
 {
+/* recursively call memory free of alignment object or list */
 	ALN *N = A->next;
-	if (A->name1) free(A->name1), A->name1 = NULL;
-	if (A->name2) free(A->name2), A->name2 = NULL;
-	if (A->seq1) free(A->seq1), A->seq1 = NULL;
-	if (A->seq2) free(A->seq2), A->seq2 = NULL;
-	if (A->aln1) free(A->aln1), A->aln1 = NULL;
-	if (A->aln2) free(A->aln2), A->aln2 = NULL;
+	if (A->name1)
+		free(A->name1), A->name1 = NULL;
+	if (A->name2)
+		free(A->name2), A->name2 = NULL;
+	if (A->seq1)
+		free(A->seq1), A->seq1 = NULL;
+	if (A->seq2)
+		free(A->seq2), A->seq2 = NULL;
+	if (A->aln1)
+		free(A->aln1), A->aln1 = NULL;
+	if (A->aln2)
+		free(A->aln2), A->aln2 = NULL;
 	free((char *)A);
 	if (N)
 		aln_free(N);
 }
 
 ALN *aln_obj(char *name1, char *name2, char *seq1, char *seq2, char *aln1, char *aln2)
-/* return a populated ALN object */
 {
+/* return a populated ALN object */
 	ALN *A = aln_alloc();
-	if (name1) A->name1 = string_copy(name1);
-	if (name2) A->name2 = string_copy(name2);
-	if (seq1) A->seq1 = string_copy(seq1);
-	if (seq2) A->seq2 = string_copy(seq2);
-	if (aln1) A->aln1 = string_copy(aln1);
-	if (aln2) A->aln2 = string_copy(aln2);
+	if (name1)
+		A->name1 = string_copy(name1);
+	if (name2)
+		A->name2 = string_copy(name2);
+	if (seq1)
+		A->seq1 = string_copy(seq1);
+	if (seq2)
+		A->seq2 = string_copy(seq2);
+	if (aln1)
+		A->aln1 = string_copy(aln1);
+	if (aln2)
+		A->aln2 = string_copy(aln2);
 	/* do that with statistics here! */
-	return(A);
+	return (A);
 }
 
-void aln_write_json(ALN *A)
-/* Write simple JSON, note, sets global variable jsnfp, which must be pre-initialized to NULL */
+void aln_write_json(ALN * A)
 {
-	if (! jsnfp) {
+/* Write simple JSON, note, sets global variable jsnfp, which must be pre-initialized to NULL */
+	if (!jsnfp) {
 		char *filename = char_vector(strlen(oprefix) + strlen(".aln.js") + 1);
 		sprintf(filename, "%s%s", oprefix, ".aln.js");
 		fprintf(stderr, "jsnfile %s\n", filename);
@@ -1203,14 +1219,15 @@ void aln_write_json(ALN *A)
 	j_dbl(jsnfp, YES, "sd0", A->sd0, NULL, NULL);
 	j_dbl(jsnfp, YES, "sd1", A->sd1, NULL, NULL);
 	j_dbl(jsnfp, YES, "sd2", A->sd2, NULL, NULL);
-	j_dbl(jsnfp, NO, "sd", A->sd, NULL, NULL); /* last data element receives a NO to solve a json-related issue */
+	j_dbl(jsnfp, NO, "sd", A->sd, NULL, NULL);	/* last data element receives a NO to solve a json-related
+							issue */
 	j_cls(jsnfp);
 	fflush(jsnfp);
 }
 
-void aln_write_stderr(ALN *A)
-/* write text alignment to stderr */
+void aln_write_stderr(ALN * A)
 {
+/* write text alignment to stderr */
 	/* free-form text */
 	fprintf(stderr, "Align %s %d x %s %d", A->name1, A->len1, A->name2, A->len2);
 	fprintf(stderr, " O1 %d O2 %d", A->start1, A->start2);
@@ -1223,11 +1240,11 @@ void aln_write_stderr(ALN *A)
 	fprintf(stderr, "\n");	/* extra newline for human readability */
 }
 
-void aln_write_text(ALN *A)
+void aln_write_text(ALN * A)
+{
 /* write plain structured text for alignment, requires that alnfp is initially NULL */
 /* special case of supplied fp causes a write and exit */
-{
-	if (! alnfp) {
+	if (!alnfp) {
 		char *filename = char_vector(strlen(oprefix) + strlen(".aln.txt") + 1);
 		sprintf(filename, "%s%s", oprefix, ".aln.txt");
 		if ((alnfp = fopen(filename, "w")) == NULL)
@@ -1249,8 +1266,8 @@ void aln_write_text(ALN *A)
 
 #define MAXSCOREDIST 9999.9
 double compute_scoredistance(double ma, double mr, double m1, double m2, double scale)
-/* unpublished Gippert, G.P, ca 2009, sequence-length normalization of ScoreDist from Sonnhammer & Hollich 2005 */
 {
+/* unpublished Gippert, G.P, ca 2009, sequence-length normalization of ScoreDist from Sonnhammer & Hollich 2005 */
 	double num = ma - (mr * scale);
 	double den = ((m1 + m2) / 2.0 - mr) * scale;
 	double e = num / den, sd;
@@ -1266,8 +1283,8 @@ double compute_scoredistance(double ma, double mr, double m1, double m2, double 
 
 /* Find alignment from cumultative matching scores */
 ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, double **S, double **M, int align_flag)
-/* return match score and indirectly *alen and alignment strings *a1 and *a2 */
 {
+/* return match score and indirectly *alen and alignment strings *a1 and *a2 */
 	char *aln1, *aln2, *t1, *t2;
 	int plen, alen, mlen, ilen, glen, olen, clen, nlen, i, j, k, l, nk, nl;
 	double max, tmp, *scovec, ascore, gscore, mscore, mscore1, mscore2, mscorer, zs, ps;
@@ -1278,8 +1295,8 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 		plen = alen = mlen = ilen = glen = olen = clen = nlen = 0;
 		ascore = gscore = mscore = mscore1 = mscore2 = mscorer = ps = 0.0;
 		zs = -99.9;
-		t1     = char_vector(len1 + len2 + 2);
-		t2     = char_vector(len1 + len2 + 2);
+		t1 = char_vector(len1 + len2 + 2);
+		t2 = char_vector(len1 + len2 + 2);
 
 		if (align_flag & ALIGN_PAD) {
 			for (i = 0; i < o1; i++) {
@@ -1297,7 +1314,7 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 		/* inject first aligned position into score, counts and alignment strings */
 		k = o1;
 		l = o2;
-		mscore  += S[k][l];
+		mscore += S[k][l];
 		mscore1 += S[k][len2];
 		mscore2 += S[len1][l];
 		mscorer -= 1.0;
@@ -1340,29 +1357,12 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 			}
 			/* cross-over gap in both column and row ? */
 #ifdef RAW_CODE
-			/* this version is the most 'correct', although the crossover gap is not
-			 * described in any other source code for SW local alignment, afaik. */
+			/* this version is the most 'correct', although the crossover gap is not described in any other
+			source code for SW local alignment, afaik. */
 			if (align_flag & ALIGN_CROSS) {
 				for (i = k + 1; i < len1; i++)
-				for (j = l + 1; j < len2; j++) {
-					int g = i - (k + 1) + j - (l + 1);
-					tmp = M[i][j] - (g ? p_go + p_ge * (g - 1) : 0.0);
-					if (tmp > max) {
-						max = tmp;
-						nk = i;
-						nl = j;
-					}
-				}
-			}
-#else
-			/* this version limits the search scope for a suitable crossover match to p_gx */
-			if (p_gx && align_flag & ALIGN_CROSS) {
-				int g, h, x = len1 - (k + 1) + len2 - (l + 1);
-				x = (x > p_gx ? p_gx : x);
-				for (g = 0; g < x; g++)
-				for (h = 0; h <= g; h++) {
-					i = k + 1 + h, j = l + 1 + g - h;
-					if (i < len1 && j < len2) {
+					for (j = l + 1; j < len2; j++) {
+						int g = i - (k + 1) + j - (l + 1);
 						tmp = M[i][j] - (g ? p_go + p_ge * (g - 1) : 0.0);
 						if (tmp > max) {
 							max = tmp;
@@ -1370,7 +1370,24 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 							nl = j;
 						}
 					}
-				}
+			}
+#else
+			/* this version limits the search scope for a suitable crossover match to p_gx */
+			if (p_gx && align_flag & ALIGN_CROSS) {
+				int g, h, x = len1 - (k + 1) + len2 - (l + 1);
+				x = (x > p_gx ? p_gx : x);
+				for (g = 0; g < x; g++)
+					for (h = 0; h <= g; h++) {
+						i = k + 1 + h, j = l + 1 + g - h;
+						if (i < len1 && j < len2) {
+							tmp = M[i][j] - (g ? p_go + p_ge * (g - 1) : 0.0);
+							if (tmp > max) {
+								max = tmp;
+								nk = i;
+								nl = j;
+							}
+						}
+					}
 			}
 #endif
 			if (max > 0) {
@@ -1396,7 +1413,7 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 				/* inject next match position into score, counts and alignment strings */
 				k = nk;
 				l = nl;
-				mscore  += S[k][l];
+				mscore += S[k][l];
 				mscore1 += S[k][len2];
 				mscore2 += S[len1][l];
 				mscorer -= 1.0;
@@ -1435,8 +1452,7 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 
 		if (mlen > 0) {
 			zs = blosum_zscore(mscore, mlen);
-			/* the 'query' length is arbitrarily defined as the length
-		   	of the first sequence */
+			/* the 'query' length is arbitrarily defined as the length of the first sequence */
 			if (zs > 0.0)
 				ps = blosum_pscore(zs, len1);
 		}
@@ -1457,56 +1473,59 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 
 		/* compute score distances */
 
-		// normalized to shortest sequence length
-		int minlen = (len1 < len2 ? len1 : len2);
-		double scale =  (double)minlen/(double)mlen;
+		//normalized to shortest sequence length
+			int minlen = (len1 < len2 ? len1 : len2);
+		double scale = (double)minlen / (double)mlen;
 		a->sd = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
 
-		// normalized to sequence1 length
-		scale = (double)len1/(double)mlen;
+		//normalized to sequence1 length
+			scale = (double)len1 / (double)mlen;
 		a->sd1 = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
 
-		// normalize to sequence2 length
-		scale = (double)len2/(double)mlen;
+		//normalize to sequence2 length
+			scale = (double)len2 / (double)mlen;
 		a->sd2 = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
 
-		// normalize to alignment length (original Sohnhammer Scoredist)
-		scale = (double)alen/(double)mlen;
+		//normalize to alignment length(original Sohnhammer Scoredist)
+			scale = (double)alen / (double)mlen;
 		a->sd0 = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
 	}
-	return(a);
+	return (a);
 }
 
 int p_strict = 0;		/* 1 to allow no deviation in the recomputation of alignment score */
 
-void align_stats(ALN *A, int expected_plen, double expected_ascore)
-/* compute (missing) ALN statistics */
+void align_stats(ALN * A, int expected_plen, double expected_ascore)
 {
-	if (A->aln1 == NULL) fprintf(stderr, "align_stats A->aln1 == NULL\n"), exit(1);
-	if (A->aln2 == NULL) fprintf(stderr, "align_stats A->aln2 == NULL\n"), exit(1);
+/* compute (missing) ALN statistics */
+	if (A->aln1 == NULL)
+		fprintf(stderr, "align_stats A->aln1 == NULL\n"), exit(1);
+	if (A->aln2 == NULL)
+		fprintf(stderr, "align_stats A->aln2 == NULL\n"), exit(1);
 
-	// plen = count total (padded + gapped) length of alignment
-	if ((A->plen = strlen(A->aln1)) != strlen(A->aln2))
+	//plen = count total(padded + gapped) length of alignment
+		if ((A->plen = strlen(A->aln1)) != strlen(A->aln2))
 		fprintf(stderr, "strlen(A->aln1) %ld != strlen(A->aln2) %ld\n%s\n%s\n", strlen(A->aln1), strlen(A->aln2), A->aln1, A->aln2), exit(1);
 
-	// I forgot the use case for testing plen == expected_plen ...
-	if (expected_plen > 0 && A->plen != expected_plen)
-		fprintf(stderr, "A->plen %d != expected_plen %d\n", A->plen, expected_plen), exit(1);
+	//I forgot the use case for testing
+		plen == expected_plen...
+			if (expected_plen > 0 && A->plen != expected_plen)
+			fprintf(stderr, "A->plen %d != expected_plen %d\n", A->plen, expected_plen), exit(1);
 
-	// alen = count aligned positions
-	// mlen = count matched positions
-	// ilen = count identical positions
-	// glen = count gap positions
-	// olen = count gap openings
-	// clen = count conservative matches(score > 0)
-	// nlen = count non - negative matches(score >= 0)
-	// ascore = sum alignment match score minus total gap cost
-	// mscore = sum alignment match score
-	// mscore1 = sum sequence1 match score over aligned region
-	// mscore2 = sum sequence2 match score over aligned region
-	// mscorer = sum alignment random match score * /
-	//o1, o2 = 1 - based sequence offsets to start of local alignment
-	int i, isg = 0, o1 = -1, o2 = -1, n1 = 0, n2 = 0;
+	//alen = count aligned positions
+		// mlen = count matched positions
+		// ilen = count identical positions
+		// glen = count gap positions
+		// olen = count gap openings
+		// clen = count conservative matches(score > 0)
+		// nlen = count non - negative matches(score >= 0)
+		// ascore = sum alignment match score minus total gap cost
+		// mscore = sum alignment match score
+		// mscore1 = sum sequence1 match score over aligned region
+		// mscore2 = sum sequence2 match score over aligned region
+		// mscorer = sum alignment random match score * /
+		//o1, o2 = 1 - based sequence offsets to start of local alignment
+		int i, isg = 0, o1 = -1, o2 = -1, n1 = 0, n2 = 0;
 
 	/* compute gaps and match scores from the alignment strings */
 	double sum_score = 0.0;
@@ -1525,7 +1544,7 @@ void align_stats(ALN *A, int expected_plen, double expected_ascore)
 				sum_score += s;
 			double gap_score = p_go * (float)(A->olen) + p_ge * (float)(A->glen - A->olen);
 			printf("aln[ %d ] : '%d%c' vs '%d%c' :  score %g, sumscore %g, gapscore %g, total_score %g\n",
-		       		i, n1, a, n2, b, s, sum_score, gap_score, (sum_score - gap_score));
+			       i, n1, a, n2, b, s, sum_score, gap_score, (sum_score - gap_score));
 		}
 		/* ignore pad positions (outside of the local alignment) */
 		if (a == ALIGN_PAD_CHAR || b == ALIGN_PAD_CHAR)
@@ -1556,8 +1575,10 @@ void align_stats(ALN *A, int expected_plen, double expected_ascore)
 		A->mscorer -= 1.0;	/* random match expectation */
 		isg = 0;
 	}
-	if (A->seq1 && strlen(A->seq1) != n1) fprintf(stderr, "Sequence len(seq1) %ld != recomputed sequence length n1 %d\n", strlen(A->seq1), n1), exit(1);
-	if (A->seq2 && strlen(A->seq2) != n2) fprintf(stderr, "Sequence len(seq2) %ld != recomputed sequence length n2 %d\n", strlen(A->seq2), n2), exit(1);
+	if (A->seq1 && strlen(A->seq1) != n1)
+		fprintf(stderr, "Sequence len(seq1) %ld != recomputed sequence length n1 %d\n", strlen(A->seq1), n1), exit(1);
+	if (A->seq2 && strlen(A->seq2) != n2)
+		fprintf(stderr, "Sequence len(seq2) %ld != recomputed sequence length n2 %d\n", strlen(A->seq2), n2), exit(1);
 	A->start1 = o1;
 	A->start2 = o2;
 	A->len1 = n1;
@@ -1595,17 +1616,17 @@ void align_stats(ALN *A, int expected_plen, double expected_ascore)
 }
 
 ALN *pair_msa(int fi, int fj)
-/* Return pairwise alignment of fasta entries fi vs fj interpolated/inferred from multiple sequence alignment */
 {
+/* Return pairwise alignment of fasta entries fi vs fj interpolated/inferred from multiple sequence alignment */
 	char *a1 = fseq[fi], *a2 = fseq[fj];
 	ALN *A = aln_obj(flab[fi], flab[fj], NULL, NULL, fseq[fi], fseq[fj]);
 	align_stats(A, -1, -1.0);
-	return(A);
+	return (A);
 }
 
 ALN *pair_sw(int fi, int fj)
-/* Return pairwise alignment of fasta entries fi vs fj computed using local aligment algorithm (Smith-Waterman 1981) */
 {
+/* Return pairwise alignment of fasta entries fi vs fj computed using local aligment algorithm (Smith-Waterman 1981) */
 	int align_flag = ALIGN_GAP | ALIGN_PAD | ALIGN_CROSS;
 	char *s1 = fseq[fi], *s2 = fseq[fj];
 	int o1, o2, n1 = strlen(s1), n2 = strlen(s2);
@@ -1615,17 +1636,16 @@ ALN *pair_sw(int fi, int fj)
 	ALN *A = align_ali(s1, s2, n1, n2, o1, o2, sx, mx, align_flag);
 	A->name1 = string_copy(flab[fi]);
 	A->name2 = string_copy(flab[fj]);
-	return(A);
+	return (A);
 }
 
 double **global_dmx = NULL;
 double **global_imx = NULL;
 
 void align_fasta()
-	/* compute or interpolate all pairwise alignments
-	 * optionally write alignment(s) out in different flagged formats,
-	 * AND populate global distance matrix and global percent identity matrix */
 {
+	/* compute or interpolate all pairwise alignments optionally write alignment(s) out in different flagged
+	formats, AND populate global distance matrix and global percent identity matrix */
 	int i, inext, j;
 	if (global_dmx)
 		fprintf(stderr, "align_fasta: global_dmx is already allocated\n"), exit(1);
@@ -1636,13 +1656,13 @@ void align_fasta()
 	ALN *A;
 	for (i = 0; i < g_index; i++) {
 		for (j = (p_nonself ? i + 1 : i); j < g_index; j++) {
-			A =  (p_msa ? pair_msa(i, j) : pair_sw(i, j));
+			A = (p_msa ? pair_msa(i, j) : pair_sw(i, j));
 			if (p_jaln)
 				aln_write_json(A);
 			if (p_taln)
 				aln_write_text(A);
 			global_dmx[i][j] = global_dmx[j][i] = A->sd;
-			global_imx[i][j] = global_imx[j][i] = 100.0 * (double)(A->ilen)/(double)(A->mlen);
+			global_imx[i][j] = global_imx[j][i] = 100.0 * (double)(A->ilen) / (double)(A->mlen);
 			aln_free(A);
 		}
 	}
@@ -1655,8 +1675,8 @@ int p_ilim = 1000;		/* embed iteration limit: default 1000 */
 double p_clim = 1.0e-12;	/* embed polynomial convergence limit, default 1e-12 */
 
 double eigvec(int n, double **mx, double *v, double *t)
-/* Determine most significant eigenvector of matrix m by successive approximation (Crippen & Havel) */
 {
+/* Determine most significant eigenvector of matrix m by successive approximation (Crippen & Havel) */
 	int i, j, count = 0;
 	double norm;
 	double_vector_drand48(n, t, -1.0, 1.0);
@@ -1699,8 +1719,8 @@ double eigvec(int n, double **mx, double *v, double *t)
 }
 
 void matrix_deflate(int n, double **mx, double *v, double e)
-/* eliminate eigenspace of last eigenvalue from matrix, reducing its rank by one (Crippen & Havel 1988) */
 {
+/* eliminate eigenspace of last eigenvalue from matrix, reducing its rank by one (Crippen & Havel 1988) */
 	int i, j;
 	for (i = 0; i < n; i++) {
 		for (j = 0; j < n; j++) {
@@ -1711,8 +1731,8 @@ void matrix_deflate(int n, double **mx, double *v, double e)
 }
 
 double **metric_matrix(int n, double **d)
-/* produce metric matrix from distance matrix d */
 {
+/* produce metric matrix from distance matrix d */
 	double **mx = double_matrix(n, n), *comsqr = double_vector(n), radsqr = 0.0, dissqr;
 	int i, j, nneg = 0;
 	for (i = 0; i < n - 1; i++) {
@@ -1744,17 +1764,17 @@ double **metric_matrix(int n, double **d)
 }
 
 void double_vector_scale(int n, double *v, double scale)
-/* multiple vector by scalar value */
 {
+/* multiple vector by scalar value */
 	int i;
 	for (i = 0; i < n; i++)
 		v[i] *= scale;
 }
 
 double **embed_dmx(int n, double **d)
+{
 /* N-dimensional embedding of distance matrix using metric matrix distance geometry.
 // (Crippen & Havel, 1988, p 311). Uses matrix exhaustion and matrix deflation. */
-{
 	int i, j;
 	double **mx = metric_matrix(n, d);	/* metric matrix (dot products of COM vectors) */
 	double **v = double_matrix(p_edim, n);	/* eigenvectors (dim x n) */
@@ -1837,7 +1857,7 @@ void bnode_free(BNODE * B)
 	B = NULL;
 }
 
-void bnode_vec_free(BNODE ** bnode, int n)
+void bnode_vec_free(BNODE * *bnode, int n)
 {
 	int i;
 	BNODE *B;
@@ -1852,10 +1872,10 @@ void bnode_vec_free(BNODE ** bnode, int n)
 }
 
 BNODE **bnode_vec(int n, int alloc)
-/* return vector of 'empty' Bnodes with no parent/left/right/pos/dim/index assignments */
 {
+/* return vector of 'empty' Bnodes with no parent/left/right/pos/dim/index assignments */
 	BNODE **vec;
-	if ((vec = (BNODE **) malloc(sizeof(BNODE *) * n)) == NULL)
+	if ((vec = (BNODE * *) malloc(sizeof(BNODE *) * n)) == NULL)
 		fprintf(stderr, "Cannot allocate bnode_vec %d\n", n), exit(1);
 	int i;
 	if (alloc)
@@ -1945,8 +1965,8 @@ double bnode_dis_treebranch(BNODE * A, BNODE * B)
 }
 
 double bnode_dis(BNODE * A, BNODE * B)
-/* return Euclidean distance (norm 2) between two N-dimensional BNODEs */
 {
+/* return Euclidean distance (norm 2) between two N-dimensional BNODEs */
 	/* special case of positionless binary tree */
 	if (A->pos == NULL && B->pos == NULL)
 		return 0.0;
@@ -1973,15 +1993,15 @@ double bnode_dis(BNODE * A, BNODE * B)
 }
 
 int bnode_count(BNODE * B)
-/* recursive number of defined leaf nodes in tree */
 {
+/* recursive number of defined leaf nodes in tree */
 	if (B->index >= 0)
 		return 1;
 	else if (B->left == NULL || B->right == NULL)
 		fprintf(stderr, "B->left is NULL or B->right is NULL\n"), exit(1);
 	return bnode_count(B->left) + bnode_count(B->right);
 }
-int bnode_length(BNODE *B)
+int bnode_length(BNODE * B)
 {
 	return bnode_count(B);
 }
@@ -2047,9 +2067,9 @@ void bnode_indexi(BNODE * B, int *index, int *i)
 }
 
 void between(double **mx, int n, int *index, int m, int *jndex, double *ave, double *sd)
+{
 /* average and population standard deviation between points in two sets (n, index) vs (m, jndex)
  * from matrix elements */
-{
 	*ave = *sd = 0.0;
 	double val, sum = 0.0, cnt = 0.0, sqr = 0.0;
 	int i, j;
@@ -2060,35 +2080,35 @@ void between(double **mx, int n, int *index, int m, int *jndex, double *ave, dou
 			cnt += 1.0;
 			sqr += val * val;
 		}
-	if (cnt > 0.0){
-		*ave = sum/cnt;
-		*sd = sqrt(fabs(sqr/cnt - (*ave)*(*ave)));
+	if (cnt > 0.0) {
+		*ave = sum / cnt;
+		*sd = sqrt(fabs(sqr / cnt - (*ave) * (*ave)));
 	}
 }
 
 void within(double **mx, int n, int *index, double *ave, double *sd)
+{
 /* average and population standard deviation among points in a set (n, index)
  * from matrix elements */
-{
 	*ave = *sd = 0.0;
 	double val, sum = 0.0, cnt = 0.0, sqr = 0.0;
 	int i, j;
 	for (i = 0; i < n; i++)
-		for (j = i+1; j < n; j++) {
+		for (j = i + 1; j < n; j++) {
 			val = mx[index[i]][index[j]];
 			sum += val;
 			cnt += 1.0;
 			sqr += val * val;
 		}
-	if (cnt > 0.0){
-		*ave = sum/cnt;
-		*sd = sqrt(fabs(sqr/cnt - (*ave)*(*ave)));
+	if (cnt > 0.0) {
+		*ave = sum / cnt;
+		*sd = sqrt(fabs(sqr / cnt - (*ave) * (*ave)));
 	}
 }
 
-void bnode_print_metadata(FILE *fp, BNODE *left, BNODE *right)
-/* print metadata comparing left and right branches */
+void bnode_print_metadata(FILE * fp, BNODE * left, BNODE * right)
 {
+/* print metadata comparing left and right branches */
 	/* leaf nodes in left subtree */
 	int n = bnode_count(left);
 	int *index = int_vector(n), i = 0;
@@ -2125,9 +2145,18 @@ void bnode_print_metadata(FILE *fp, BNODE *left, BNODE *right)
 
 #ifdef DEBUG
 	/* print out all indices and lists and inspect once visually to make sure code works */
-	printf("N %d :", n); for (i = 0; i < n; i++) printf(" (%d,%d)", i, index[i]); printf("\n");
-	printf("M %d :", m); for (j = 0; j < m; j++) printf(" (%d,%d)", j, jndex[j]); printf("\n");
-	printf("O %d :", o); for (k = 0; k < o; k++) printf(" (%d,%d)", k, kndex[k]); printf("\n");
+	printf("N %d :", n);
+	for (i = 0; i < n; i++)
+		printf(" (%d,%d)", i, index[i]);
+	printf("\n");
+	printf("M %d :", m);
+	for (j = 0; j < m; j++)
+		printf(" (%d,%d)", j, jndex[j]);
+	printf("\n");
+	printf("O %d :", o);
+	for (k = 0; k < o; k++)
+		printf(" (%d,%d)", k, kndex[k]);
+	printf("\n");
 #endif
 	free((char *)index);
 	free((char *)jndex);
@@ -2181,11 +2210,11 @@ void bnode_print(FILE * fp, BNODE * B)
 		fprintf(fp, "\n");
 }
 
-void bnode_bnodei(BNODE * B, BNODE ** bnode, int *i)
+void bnode_bnodei(BNODE * B, BNODE * *bnode, int *i)
+{
 /* recursive assign ith value of bnode vector to tree-ordered leaf node
 // DO NOT DELETE the indirectly-allocated bnode in the usual way as it
 // might also delete parts of the tree it points to */
-{
 	if (B->index >= 0)
 		bnode[(*i)++] = B;
 	else if (B->left && B->right) {
@@ -2196,13 +2225,13 @@ void bnode_bnodei(BNODE * B, BNODE ** bnode, int *i)
 		fprintf(stderr, "bnode_bnodei: B->left xor B->right in bnode_bnodei\n"), exit(1);
 }
 
-#define DMX_ONE		0x00000001  /* == 1 */
-#define DMX_TWO		0x00000002  /* == 2 */
-#define DMX_THREE	0x00000004  /* == 4 */
-#define DMX_FOUR	0x00000008  /* == 8 */
-#define DMX_FIVE	0x00000010  /* == 16 */
-#define DMX_SIX		0x00000020  /* == 32 */
-#define DMX_SEVEN	0x00000040  /* == 64 */
+#define DMX_ONE		0x00000001	/* == 1 */
+#define DMX_TWO		0x00000002	/* == 2 */
+#define DMX_THREE	0x00000004	/* == 4 */
+#define DMX_FOUR	0x00000008	/* == 8 */
+#define DMX_FIVE	0x00000010	/* == 16 */
+#define DMX_SIX		0x00000020	/* == 32 */
+#define DMX_SEVEN	0x00000040	/* == 64 */
 
 
 /* provide a binary tree from a DISTANCE matrix using nearest-neighbor joining algorithm and DISTANCE averaging (yuck) */
@@ -2210,10 +2239,15 @@ void bnode_bnodei(BNODE * B, BNODE ** bnode, int *i)
 BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 {
 
-	if (dmx_flag & DMX_ONE) { fprintf(stderr, "DMX ONE is coded\n"); }
-	else
-	if (dmx_flag & DMX_TWO) { fprintf(stderr, "DMX TWO is coded\n"); }
-	else { printf("DMX NONE of the above\n"), exit(1); }
+	if (dmx_flag & DMX_ONE) {
+		fprintf(stderr, "DMX ONE is coded\n");
+	}
+	else if (dmx_flag & DMX_TWO) {
+		fprintf(stderr, "DMX TWO is coded\n");
+	}
+	else {
+		printf("DMX NONE of the above\n"), exit(1);
+	}
 
 	/* total number of nodes needed for a binary tree is 2N - 1 where N = number of leaf nodes */
 	int nodes = 2 * n - 1;
@@ -2290,7 +2324,8 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 		if (p_r == 'N') {
 			P->left = A;
 			P->right = B;
-		} else {
+		}
+		else {
 			int ac = bnode_count(A);
 			int bc = bnode_count(B);
 			if (p_r == 'L') {	/* largest subtree to left */
@@ -2326,7 +2361,7 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 		avail[minj] = 0;
 
 		/* update distances to node m from remaining available nodes  */
-        	double dis, sd_dis;
+		double dis, sd_dis;
 		if (dmx_flag & DMX_ONE) {
 			/* Average branch length */
 			for (i = 0; i < m; i++) {
@@ -2336,16 +2371,15 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 				}
 			}
 		}
-		else
-		if (dmx_flag & DMX_TWO) {
+		else if (dmx_flag & DMX_TWO) {
 			/* Average leaf-to-leaf distance */
 			nl = 0;
-        		bnode_indexi(P, lindex, &nl);
+			bnode_indexi(P, lindex, &nl);
 			for (i = 0; i < m; i++) {
 				if (avail[i]) {
 					nr = 0;
-        				bnode_indexi(bvec[i], rindex, &nr);
-        				between(global_dmx, nl, lindex, nr, rindex, &dis, &sd_dis);
+					bnode_indexi(bvec[i], rindex, &nr);
+					between(global_dmx, nl, lindex, nr, rindex, &dis, &sd_dis);
 					smx[i][m] = smx[m][i] = dis;
 					if (p_v > 1)
 						fprintf(stderr, "D m %d (%d) i %d (%d) = %g +/- %g\n",
@@ -2382,8 +2416,8 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 
 	double_matrix_free(nodes, nodes, smx);
 	int_vector_free(nodes, avail);
-        int_vector_free(nodes, lindex);
-        int_vector_free(nodes, rindex);
+	int_vector_free(nodes, lindex);
+	int_vector_free(nodes, rindex);
 
 	return P;
 }
@@ -2393,10 +2427,10 @@ BNODE *bnode_tree(double **pos, int *index, int n, int dim, double **dmx)
 {
 
 	/* algorithm: // allocate BNODE vector of length 2N-1, with N of them with 'natural' index numbers (leaf nodes)
-	   // and N-1 of them with index number -1 (tree nodes) without assigning any of them parentage. // allocate
-	   integer 'use' vector of length 2N-1, // alternatively double 'weight' vector of length 2N-1, 1.0 for leafs
-	   0.0 for others... // allocate dmatrix of length 2N-1 x 2N-1, with first N positions taken by actual
-	   distances // find the minimum non-used element in the matrix, join the nodes. */
+	// and N-1 of them with index number -1 (tree nodes) without assigning any of them parentage. // allocate
+	integer 'use' vector of length 2N-1, // alternatively double 'weight' vector of length 2N-1, 1.0 for leafs 0.0
+	for others... // allocate dmatrix of length 2N-1 x 2N-1, with first N positions taken by actual distances //
+	find the minimum non-used element in the matrix, join the nodes. */
 
 	int nodes = 2 * n - 1;
 	if (nodes > MAXNODES)
@@ -2592,7 +2626,7 @@ void bnode_positional_distance_difference(BNODE * B, double **odmx)
 
 	/* assign bnode lookup vector */
 	BNODE **bnode;
-	bnode = bnode_vec(n, 0);/* allocate bnode pointer vector */
+	bnode = bnode_vec(n, 0);	/* allocate bnode pointer vector */
 	i = 0;
 	bnode_bnodei(B, bnode, &i);
 	if (i != n)
@@ -2637,7 +2671,7 @@ void bnode_treebranch_distance_difference(BNODE * B, double **odmx)
 
 	/* assign bnode lookup vector */
 	BNODE **bnode;
-	bnode = bnode_vec(n, 0);/* allocate bnode pointer vector */
+	bnode = bnode_vec(n, 0);	/* allocate bnode pointer vector */
 	i = 0;
 	bnode_bnodei(B, bnode, &i);
 	if (i != n)
@@ -2738,7 +2772,7 @@ BNODE *bnode_reembed(BNODE * B, char br, double **odmx, int on, int dim)
 			fprintf(stderr, "bnode_reembed, unknown branch rotation br '%c'\n", br), exit(1);
 	}
 	/* note - do not change P->parent->{left,right}_distance // as they are determined by a 'higher' level
-	   embedding // recursively apply this to left and right subbranches */
+	embedding // recursively apply this to left and right subbranches */
 
 	P->left = bnode_reembed(P->left, 'L', odmx, on, dim);
 	P->right = bnode_reembed(P->right, 'R', odmx, on, dim);
@@ -2764,8 +2798,8 @@ void write_tree(BNODE * P, char *filename)
 }
 
 void write_dmx(char *oprefix)
-/* print distance upper half matrix plus diagonal */
 {
+/* print distance upper half matrix plus diagonal */
 	char *filename = char_vector(strlen(oprefix) + strlen(".dmx.txt") + 1);
 	sprintf(filename, "%s%s", oprefix, ".dmx.txt");
 	FILE *fp;
@@ -2777,7 +2811,7 @@ void write_dmx(char *oprefix)
 			fprintf(fp, "%s %s %f\n", flab[i], flab[j], global_dmx[i][j]);
 	fclose(fp);
 	fprintf(stderr, "Wrote dmx %s %d elements, expect N(N+1)/2 %d for N=%d\n",
-		filename, c, g_index*(g_index+1)/2, g_index);
+		filename, c, g_index * (g_index + 1) / 2, g_index);
 	free(filename);
 }
 
@@ -2788,8 +2822,9 @@ BNODE *bnode_distance_tree(int n, double **dmx)
 	if (p_dave)
 		dmx_flag = DMX_TWO;
 	BNODE *P = bnode_tree_dmx(n, index, dmx, dmx_flag);
-	return(P);
+	return (P);
 }
+
 /* After
 // 1. alignments have now provided a distance matrix
 // The the task of tree building can begin
@@ -2835,14 +2870,14 @@ void parameter_value_missing(int cstart, int argc, char *argv[])
 		c, argv[c], argv[0]), exit(1);
 }
 int pparse(int argc, char *argv[])
-/* parse command line and set some input and output filename defaults */
 {
+/* parse command line and set some input and output filename defaults */
 	int c = 1;
 	while (c < argc) {
 		/* flag to read multiple sequence alignment input */
 		if (strncmp(argv[c], "-msa", 4) == 0) {
 			++c;
-			p_msa = (p_msa + 1)%2;
+			p_msa = (p_msa + 1) % 2;
 			fprintf(stderr, "Multipl Sequence Alignment input %d\n", p_msa);
 		}
 
@@ -2942,17 +2977,17 @@ int pparse(int argc, char *argv[])
 		}
 		else if (strncmp(argv[c], "-jaln", 5) == 0) {
 			++c;
-			p_jaln = (p_jaln + 1)%2;
+			p_jaln = (p_jaln + 1) % 2;
 			fprintf(stderr, "Write align json %d\n", p_jaln);
 		}
 		else if (strncmp(argv[c], "-taln", 5) == 0) {
 			++c;
-			p_taln = (p_taln + 1)%2;
+			p_taln = (p_taln + 1) % 2;
 			fprintf(stderr, "Write align text %d\n", p_taln);
 		}
 		else if (strncmp(argv[c], "-wdmx", 5) == 0) {
 			++c;
-			p_wdmx = (p_wdmx + 1)%2;
+			p_wdmx = (p_wdmx + 1) % 2;
 			fprintf(stderr, "Write distance matrix text %d\n", p_wdmx);
 		}
 		else if (strncmp(argv[c], "-v", 2) == 0) {
@@ -2977,7 +3012,7 @@ int pparse(int argc, char *argv[])
 		}
 
 	}
-	
+
 	fprintf(stderr, "Input parameters:\n");
 	fprintf(stderr, " -msa		multiple sequence alignment input (%d)\n", p_msa);
 	fprintf(stderr, " -alf		alignfastas input (%d)\n", p_alf);
@@ -3021,7 +3056,7 @@ void read_fasta_files(int argc, char *argv[], int cstart)
 	for (c = cstart; c < argc; c++) {
 		fprintf(stderr, " argv[%d], %s\n", c, argv[c]);
 		read_fasta(argv[c]);
-		fprintf(stderr, "read Fasta[%d] %s, index %d\n", c-cstart, argv[c], g_index);
+		fprintf(stderr, "read Fasta[%d] %s, index %d\n", c - cstart, argv[c], g_index);
 	}
 }
 
@@ -3033,8 +3068,8 @@ void explain_input_better(int argc, char *argv[], int cstart)
 }
 
 void read_alf(int argc, char *argv[], int cstart)
-/* read ALIGNFASTAS file by file, line by line, parse into global dmx and imx matrices */
 {
+/* read ALIGNFASTAS file by file, line by line, parse into global dmx and imx matrices */
 	/* reset values of global counters and matrices altered by this subroutine */
 	global_dmx = global_imx = NULL;
 	DNODE *d1, *d2;
@@ -3042,8 +3077,7 @@ void read_alf(int argc, char *argv[], int cstart)
 	FILE *fp;
 	int c, index1, index2, i, j;
 	double pctid, sdist, **tmp_dmx = NULL, **tmp_imx = NULL;
-	/* do we only want a specific subset of accessions ?
-	*/
+	/* do we only want a specific subset of accessions ? */
 	int subset = 0;
 	if (f_accessionsfile != NULL) {
 		if ((fp = fopen(f_accessionsfile, "r")) == NULL)
@@ -3061,16 +3095,15 @@ void read_alf(int argc, char *argv[], int cstart)
 		fclose(fp);
 		subset = g_index;
 	}
-	/* allocate tmp matrices for pairwise distance, which is used in tree building,
-	   and pairwise alignment percent identity which is used later in tree branch metadata.
-	   and fill them with -99.9 meaning undefined value.  */
+	/* allocate tmp matrices for pairwise distance, which is used in tree building, and pairwise alignment percent
+	identity which is used later in tree branch metadata. and fill them with -99.9 meaning undefined value.  */
 	if ((tmp_dmx = double_matrix(MAXENTRIES, MAXENTRIES)) == NULL)
 		fprintf(stderr, "could not allocate tmp_dmx double_matrix %d x %d\n", MAXENTRIES, MAXENTRIES), exit(1);
 	if ((tmp_imx = double_matrix(MAXENTRIES, MAXENTRIES)) == NULL)
 		fprintf(stderr, "could not allocate tmp_imx double_matrix %d x %d\n", MAXENTRIES, MAXENTRIES), exit(1);
 	for (i = 0; i < g_index; i++)
-	for (j = 0; j < g_index; j++)
-		tmp_dmx[i][j] = tmp_imx[i][j] = -99.0;
+		for (j = 0; j < g_index; j++)
+			tmp_dmx[i][j] = tmp_imx[i][j] = -99.0;
 	int parsed = 0, skipped = 0, included = 0;
 	for (c = cstart; c < argc; c++) {
 		fprintf(stderr, " argv[%d], %s\n", c, argv[c]);
@@ -3080,13 +3113,14 @@ void read_alf(int argc, char *argv[], int cstart)
 			if (strlen(line) == 0 || line[0] == '#')
 				continue;
 			if (sscanf(line, "%*s %s %*d %s %*d %*d %*d %*d %*d %*d %*d %*d %*d %lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %lf",
-				label1, label2, &pctid, &sdist) != 4)
+				   label1, label2, &pctid, &sdist) != 4)
 				fprintf(stderr, "Could not sscanf label1, label2, pctid, sdist from line >>%s<<\n", line), exit(1);
 			parsed++;
 			if (subset && ((index1 = flab_index(label1)) < 0 || (index2 = flab_index(label2)) < 0)) {
 				skipped++;
 				continue;
-			} else {
+			}
+			else {
 				included++;
 				d1 = dnode_locate_or_create(label1, NULL), index1 = d1->index;
 				d2 = dnode_locate_or_create(label2, NULL), index2 = d2->index;
@@ -3101,7 +3135,7 @@ void read_alf(int argc, char *argv[], int cstart)
 		fclose(fp);
 	}
 	fprintf(stderr, "Read_alignfastas %d labels, lines parsed %d, skipped %d, included %d\n",
-			g_index, parsed, skipped, included);
+		g_index, parsed, skipped, included);
 
 	/* allocate global distance and percent identity matrices */
 	if ((global_dmx = double_matrix(g_index, g_index)) == NULL)
@@ -3112,15 +3146,15 @@ void read_alf(int argc, char *argv[], int cstart)
 	/* fill in global matrices from tmp matrices, and test for undefined values */
 	int undefined = 0;
 	for (i = 0; i < g_index; i++)
-	for (j = 0; j < g_index; j++) {
-		global_dmx[i][j] = tmp_dmx[i][j];
-		global_imx[i][j] = tmp_imx[i][j];
-		if (global_dmx[i][j] < -0.0) {
-			fprintf(stderr, "labels %s %s dmx[ %d ][ %d ] < -0.0 %lf\n",
-				flab[i], flab[j], i, j, global_dmx[i][j]);
-			undefined += 1;
+		for (j = 0; j < g_index; j++) {
+			global_dmx[i][j] = tmp_dmx[i][j];
+			global_imx[i][j] = tmp_imx[i][j];
+			if (global_dmx[i][j] < -0.0) {
+				fprintf(stderr, "labels %s %s dmx[ %d ][ %d ] < -0.0 %lf\n",
+					flab[i], flab[j], i, j, global_dmx[i][j]);
+				undefined += 1;
+			}
 		}
-	}
 	if (undefined)
 		fprintf(stderr, "Undefined distance matrix elements, program halted.\n"), exit(1);
 	double_matrix_free(MAXENTRIES, MAXENTRIES, tmp_dmx);
@@ -3129,21 +3163,19 @@ void read_alf(int argc, char *argv[], int cstart)
 }
 
 void read_dmx(char *filename)
-	/* read distance matrix from a text file with line format:
-	 *	labelI labelJ DistanceIJ
-	 * The file is read twice, first to parse and establish the uniq list of labels,
-	 * second to parse and fill in the allocated distance matrix.
-	 */
 {
+	/* read distance matrix from a text file with line format: labelI labelJ DistanceIJ The file is read twice,
+	first to parse and establish the uniq list of labels, second to parse and fill in the allocated distance
+	matrix. */
 	fprintf(stderr, "Read Distance matrix from file %s\n", filename);
 	char line[MAXLINELEN], label1[MAXWORDLEN], label2[MAXWORDLEN];
 	float value;
 	DNODE *d1, *d2;
 	int index1, index2;
 	FILE *fp = fopen(filename, "r");
-	if (!fp) fprintf(stderr, "Could not open filename %s r mode\n", filename), exit(1);
-	while (fgets(line, sizeof(line), fp) != NULL)
-	{
+	if (!fp)
+		fprintf(stderr, "Could not open filename %s r mode\n", filename), exit(1);
+	while (fgets(line, sizeof(line), fp) != NULL) {
 		if (strlen(line) == 0 || line[0] == '#')
 			continue;
 		if (sscanf(line, "%s %s %f", label1, label2, &value) != 3)
@@ -3155,25 +3187,25 @@ void read_dmx(char *filename)
 
 	/* allocate global distance and percent identity matrices */
 	global_dmx = double_matrix(g_index, g_index);
-	global_imx = NULL; /* TODO add additional arguments to enable read of pct id matrix */
+	global_imx = NULL;	/* TODO add additional arguments to enable read of pct id matrix */
 	int i, j;
 	for (i = 0; i < g_index; i++)
-		for (j = i;  j < g_index; j++)
+		for (j = i; j < g_index; j++)
 			global_dmx[i][j] = global_dmx[j][i] = -99.0;
 
-	/* Reopen the file and rescan the data. Simply faster than recording it the first time
-		NOT TRUE RIPE FOR REFACTOR */
+	/* Reopen the file and rescan the data. Simply faster than recording it the first time NOT TRUE RIPE FOR
+	REFACTOR */
 	fp = fopen(filename, "r");
-	if (!fp) fprintf(stderr, "Could not open filename %s r mode the second time !!\n", filename), exit(1);
-	while (fgets(line, sizeof(line), fp) != NULL)
-	{
+	if (!fp)
+		fprintf(stderr, "Could not open filename %s r mode the second time !!\n", filename), exit(1);
+	while (fgets(line, sizeof(line), fp) != NULL) {
 		if (strlen(line) == 0 || line[0] == '#')
 			continue;
 		if (sscanf(line, "%s %s %f", label1, label2, &value) != 3)
 			fprintf(stderr, "Could not sscanf label1, label2, value line >>%s<<\n", line), exit(1);
-		if((index1 = flab_index(label1)) < 0)
+		if ((index1 = flab_index(label1)) < 0)
 			fprintf(stderr, "Unexpected that label >>%s<< is not on flab list g_index %d\n", label1, g_index), exit(1);
-		if((index2 = flab_index(label2)) < 0)
+		if ((index2 = flab_index(label2)) < 0)
 			fprintf(stderr, "Unexpected that label >>%s<< is not on flab list g_index %d\n", label2, g_index), exit(1);
 		if (global_dmx[index1][index2] > -90.0)
 			fprintf(stderr, "Unexpected duplicate label1 %s index1 %d label2 %s index2 %d g_index %d\n",
@@ -3224,7 +3256,7 @@ int main(int argc, char *argv[])
 	int i, j, neg = 0;
 	for (i = 0; i < g_index; i++) {
 		for (j = 0; j < g_index; j++) {
-			if ( global_dmx[i][j] < -0.0 ) {
+			if (global_dmx[i][j] < -0.0) {
 				fprintf(stderr, "Negative i, j %d %d v %g\n", i, j, dmx[i][j]);
 				neg++;
 			}
@@ -3240,7 +3272,7 @@ int main(int argc, char *argv[])
 	sprintf(treefile, "%s%s", oprefix, ".dree.txt");
 	write_tree(dree, treefile);
 	fprintf(stderr, "Distance tree written to %s %.3f elapsed CPU seconds, %d clock seconds\n",
-			treefile, elapsed(stime), clocktime(ctime));
+		treefile, elapsed(stime), clocktime(ctime));
 	if (p_e == 'D')
 		fprintf(stderr, "Halt after distance tree\n"), exit(0);
 	free(treefile);
@@ -3251,7 +3283,7 @@ int main(int argc, char *argv[])
 	sprintf(treefile, "%s%s", oprefix, ".tree0.txt");
 	write_tree(tree, treefile);
 	fprintf(stderr, "Single-embed tree written to %s %.3f elapsed CPU seconds, %d clock seconds\n",
-			treefile, elapsed(stime), clocktime(ctime));
+		treefile, elapsed(stime), clocktime(ctime));
 	if (p_e == 'S')
 		fprintf(stderr, "Halt after single embed tree\n"), exit(0);
 	free(treefile);
@@ -3263,7 +3295,7 @@ int main(int argc, char *argv[])
 	sprintf(treefile, "%s%s", oprefix, ".tree.txt");
 	write_tree(tree, treefile);
 	fprintf(stderr, "Full-recursive-embed tree written to %s %.3f elapsed CPU seconds, %d clock seconds\n",
-			treefile, elapsed(stime), clocktime(ctime));
+		treefile, elapsed(stime), clocktime(ctime));
 	free(treefile);
 
 	exit(0);
