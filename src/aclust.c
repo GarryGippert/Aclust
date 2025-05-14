@@ -195,10 +195,10 @@ float elapsed(float stime)
 #define SIGN(a)		( (a) < 0.0 ?   (-1.0) :    (1.0) )
 
 int p_h = 0;			/* help flag - print variables and exit */
-int p_v = 0;			/* verbose flag, set to 1 for additional diagnostic output */
+int p_v = 0;			/* verbose flag, 1 for additional diagnostic output */
 double p_go = 10.0;		/* gap open = first gap penalty */
 double p_ge = 0.5;		/* gap extend = next gap penalty */
-int p_gx = 0;			/* maximum gap crossover length (set to 0 to deactivate) */
+int p_gx = 0;			/* maximum gap crossover length (0 to deactivate) */
 
 int p_msa = 0;			/* multiple sequence alignment input (FASTA only) */
 int p_alf = 0;			/* alignfastas input (and not Fasta files) */
@@ -403,13 +403,13 @@ char *char_vector(int n)
 	return (str);
 }
 
-char *char_string(char *inp)
+char *string_copy(char *str)
 {
-	int n = strlen(inp);
-	char *str = char_vector(n);
-	strcpy(str, inp);
-	str[n] = 0;
-	return (str);
+	int n = strlen(str);
+	char *new = char_vector(n);
+	strcpy(new, str);
+	new[n] = 0;
+	return (new);
 }
 
 char **char_matrix(int ni, int nj)
@@ -608,12 +608,12 @@ double scorematrix_element(char a, char b)
 	return (blosum_mtx[aa][bb]);
 }
 
-int *residue_type_index_vector(char *fseq)
+int *residue_type_index_vector(char *seq)
 {
-	int n = strlen(fseq), i;
+	int n = strlen(seq), i;
 	int *v = int_vector(n);
 	for (i = 0; i < n; i++) {
-		int a = apos(fseq[i]);
+		int a = apos(seq[i]);
 		v[i] = a;
 	}
 	return (v);
@@ -698,21 +698,228 @@ void read_scorematrix(char *filename)
 		print_scorematrix();
 }
 
-/* SECTION FASTA */
+/* section for managing accession lookup on a treedict */
 
-/* global variables for input sources and fasta entries */
-int g_nent = 0, g_nsrc = 0;
+/* Represent a dictionary (list of words) by a letter tree.
+   Tree dnodes p have the following elements:
+	p->c: the character (MINCHAR to MAXCHAR) represented by this dnode.
+	p->w: 0 (default) or 1 when this character is a word terminator.
+	p->s[MINCHAR .. MAXCHAR] children of p or NULL
+	p->index: -1 (default) otherwise the order in which words are added to the dictionary.
+   The root of the dictionary tree has no values for c, w and index.
+*/
+
+#ifdef ALPHABETONLY
+#define MINCHAR 'a'
+#define MAXCHAR 'z'
+#else
+#define MINCHAR '!'
+#define MAXCHAR '~'
+#endif
+
+typedef struct dnode {
+	struct dnode *prev;	/* parent dnode */
+	char c;			/* letter value */
+	int w;			/* terminal letter in a word */
+	int index;		/* global index order in which completed word was added to tree */
+	struct dnode **s;	/* children dnodes indexed by MINCHAR - MAXCHAR */
+} DNODE;
+
+DNODE *dnode_alloc()
+{
+	DNODE *p;
+	char c;
+	if ((p = (DNODE *) malloc(sizeof(DNODE))) != NULL) {
+		p->prev = NULL;
+		p->c = ' ';
+		p->w = 0;
+		p->index = -1;
+		p->s = NULL;
+		/* In principle, p->s should only be allocated when needed, but for now we don't have a space problem */
+		p->s = (DNODE * *) malloc((MAXCHAR - MINCHAR + 1) * sizeof(DNODE *));
+		if (!p->s)
+			fprintf(stderr, "Cannot allocate p->s\n"), exit(1);
+		p->s -= MINCHAR;
+		for (c = MINCHAR; c <= MAXCHAR; c++)
+			p->s[c] = NULL;
+	}
+	return (p);
+}
+
+/* root of dictionary tree */
+DNODE *droot = NULL;
+
+int nword = 0, nterm = 0;
+
+void dnode_traverse(char *w, DNODE * p, int n)
+{
+	if (p == NULL)
+		return;
+	w[n] = p->c;
+	w[n + 1] = 0;
+	if (p->w) {
+		if (p_v)
+			printf("%d %s %d\n", nword, w, p->index);
+		++nword;
+	}
+
+	int t = 0;
+	char c;
+	for (c = MINCHAR; c <= MAXCHAR; c++) {
+		if (p->s[c]) {
+			if (p_v>1)
+				printf("calling dnode traverse %s+'%c' %d\n", w, c, n + 1);
+			dnode_traverse(w, p->s[c], n + 1);
+		}
+		else {
+			t++;
+		}
+	}
+
+	/* count terminal dnodes */
+	if (t == MAXCHAR - MINCHAR + 1) {
+#define FREENTERM
+#ifdef FREENTERM
+		/* I SO want to eliminate dangling letter pointers at word termini. but the proper place to do it is in
+		the allocation step. besides the space needed for all these many extra pointers is - though a
+		substantial fraction of the whole - not such a big issue with modest dictionaries to be a deciding
+		factor */
+		free((char *)(p->s + MINCHAR));
+		p->s = NULL;
+#endif
+		nterm++;
+	}
+}
+
+void showdict()
+{
+	char c, w[2028]; /* should be dimensioned to longest word in the dictionary */
+	nword = nterm = 0;
+	for (c = MINCHAR; c <= MAXCHAR; c++)
+		dnode_traverse(w, droot->s[c], 0);
+	printf("# Nword %d\n", nword);
+	printf("# Nterm %d\n", nterm);
+}
+
+
+DNODE *dnode_srch(DNODE * prev, char *word, int l, int n)
+{
+	/* branch terminates */
+	if (!prev)
+		return NULL;
+
+	/* word terminates */
+	if (n == l && prev->w)
+		return prev;
+
+	return dnode_srch(prev->s[word[n]], word, l, n + 1);
+}
+
+DNODE *dnode_locate(char *label)
+	/* locate and return DNODE or NULL */
+{
+	return dnode_srch(droot, label, strlen(label), 0);
+}
+
 #define MAXENTRIES 10000
-char *facc[MAXENTRIES];
+int g_index = 0; /*  global count of sequence labels must not exceed MAXENTRIES */
+char *flab[MAXENTRIES];
 char *fseq[MAXENTRIES];
-int fsrc[MAXENTRIES];		/* source fasta file names, worst case one sequence per file */
 /* int  *frti[MAXENTRIES]; residue index deactivated */
+
+int flab_index(char *label)
+{
+	DNODE *d = dnode_locate(label);
+	return (d ? d->index : -1);
+}
+
+DNODE *dnode_add(char *label, char *seq, int index)
+{
+	if (index >= MAXENTRIES)
+		fprintf(stderr, "Cannot create more than MAXENTRIES labels\n"), exit(1);
+	if (! droot)
+		droot = dnode_alloc();
+	DNODE *p, *new;
+	int i, na, n = strlen(label);
+	char c;
+	if (p_v)
+		printf("dnode_add(%s)\n", label);
+	i = 0;
+	p = droot;
+	na = 0;
+	while (i < n) {
+		c = label[i];
+		if (p->s[c] == NULL) {
+			new = dnode_alloc();
+			if (!new)
+				fprintf(stderr, "dnode_alloc returns NULL\n"), exit(1);
+			new->c = c;
+			if (i + 1 == n) {
+				new->w = 1;	/* last letter in word */
+				new->index = index;
+				flab[index] = string_copy(label);
+				if (seq)
+					fseq[index] = string_copy(seq);
+			}
+			p->s[c] = new;
+			new->prev = p;
+			if (p_v)
+				printf("dnode_add i %d %c w %d index %d\n",
+				       i, new->c, new->w, new->index);
+			na++;
+		}
+		p = p->s[c];
+		i++;
+	}
+	/* no allocation necessary */
+	if (!na) {
+		/* exact duplicate - disallowed (but we could skip it) */
+		if (p->w)
+			fprintf(stderr, "Duplicates not allowed %s\n", label), exit(1);
+		/* label matches ^substring of an existing dictionary element */
+		p->w = 1;
+		p->index = index;
+		flab[index] = string_copy(label);
+		if (seq)
+			fseq[index] = string_copy(seq);
+	}
+	if (p->index != flab_index(label))
+		fprintf(stderr, "Houston we have label %s dnode->index %d != flab_index %d\n",
+			label, p->index, flab_index(label)), exit(1);
+	return p;
+}
+
+DNODE *dnode_create(char *label, char *seq)
+	/* create and return DNODE, but error if it already exists */
+{
+	DNODE *d = dnode_srch(droot, label, strlen(label), 0);
+	if (d)
+		fprintf(stderr, "Should not create an existing node label %s\n", label), exit(1);
+	d = dnode_add(label, seq, g_index++);
+	return d;
+}
+
+DNODE *dnode_locate_or_create(char *label, char *seq)
+	/* locate or create and return DNODE */
+{
+	DNODE *d = dnode_srch(droot, label, strlen(label), 0);
+	if (! d)
+		d = dnode_add(label, seq, g_index++);
+	if (! d)
+		fprintf(stderr, "dnode_add returns NULL for label %s seq %s\n",
+			label, (seq ? seq : "undefined")), exit(1);
+	return d;
+}
+
+/* end treedict */
+
+/* SECTION FASTA */
 
 void print_fasta()
 {
 	int i;
-	for (i = 0; i < g_nent; i++)
-		printf(">%s\n%s\n", facc[i], fseq[i]);
+	for (i = 0; i < g_index; i++)
+		printf(">%s\n%s\n", flab[i], fseq[i]);
 }
 
 /* used in parsing text */
@@ -724,9 +931,9 @@ char line[MAXLINELEN], text[MAXLINELEN], acc[MAXLINELEN], seq[MAXSEQUENCELEN];
 */
 
 void read_fasta(char *filename)
-/* read simple sequence fasta file side effect: updates char *facc and *fseq and fsrc */
+	/* read sequence fasta file */
 {
-	int lineno = 0;
+	DNODE *d;
 	FILE *fp;
 	if ((fp = fopen(filename, "r")) == NULL)
 		fprintf(stderr, "Fasta file %s not readable\n", filename), exit(1);
@@ -734,7 +941,6 @@ void read_fasta(char *filename)
 	strcpy(acc, "");
 	strcpy(seq, "");
 	while (fgets(line, sizeof(line), fp) != NULL) {
-		lineno++;
 		if (sscanf(line, "%[^\n]", text) != 1) {
 			fprintf(stderr, "Cannot sscanf %%[^\n]:%s\n", line);
 			continue;
@@ -742,19 +948,15 @@ void read_fasta(char *filename)
 		/* skip comments */
 		if (text[0] == '#')
 			continue;
-		/* read accession (ignore rest of Fasta header) */
+		/* Fasta header line encountered */
 		if (text[0] == '>') {
-			if (g_nent >= MAXENTRIES)
-				fprintf(stderr, "Fasta count g_nent %d > MAXENTRIES %d\n", g_nent, MAXENTRIES), exit(1);
+			/* append previous record to dictionary if it exists */
 			if (strlen(acc) > 0) {
-				facc[g_nent] = char_string(acc);
-				fseq[g_nent] = char_string(seq);
-				fsrc[g_nent] = g_nsrc;
-				/* frti[g_nent] = residue_type_index_vector(fseq[g_nent]); */
+				d = dnode_add(acc, seq, g_index++);
 				strcpy(acc, "");
 				strcpy(seq, "");
-				g_nent++;
 			}
+			/* capture Fasta accession */
 			if (sscanf(text, ">%s", acc) != 1)
 				fprintf(stderr, "Cannot sscanf >%%s:%s\n", text), exit(1);
 			continue;
@@ -762,18 +964,13 @@ void read_fasta(char *filename)
 		/* otherwise accumulate sequence */
 		strcat(seq, text);
 	}
-	if (g_nent >= MAXENTRIES)
-		fprintf(stderr, "Count of fasta sequence records %d exceeds MAXENTRIES %d\n", g_nent, MAXENTRIES), exit(1);
+	/* append last record to dictionary if it exists */
 	if (strlen(acc) > 0) {
-		facc[g_nent] = char_string(acc);
-		fseq[g_nent] = char_string(seq);
-		fsrc[g_nent] = g_nsrc;
-		/* frti[g_nent] = residue_type_index_vector(fseq[g_nent]); */
+		d = dnode_add(acc, seq, g_index++);
 		strcpy(acc, "");
 		strcpy(seq, "");
-		g_nent++;
 	}
-	fprintf(stderr, "Read %d Fasta entries from %s\n", g_nent, filename);
+	fprintf(stderr, "Read %d Fasta entries from %s\n", g_index, filename);
 	fclose(fp);
 	if (p_v)
 		print_fasta();
@@ -953,12 +1150,12 @@ ALN *aln_obj(char *name1, char *name2, char *seq1, char *seq2, char *aln1, char 
 /* return a populated ALN object */
 {
 	ALN *A = aln_alloc();
-	if (name1) A->name1 = char_string(name1);
-	if (name2) A->name2 = char_string(name2);
-	if (seq1) A->seq1 = char_string(seq1);
-	if (seq2) A->seq2 = char_string(seq2);
-	if (aln1) A->aln1 = char_string(aln1);
-	if (aln2) A->aln2 = char_string(aln2);
+	if (name1) A->name1 = string_copy(name1);
+	if (name2) A->name2 = string_copy(name2);
+	if (seq1) A->seq1 = string_copy(seq1);
+	if (seq2) A->seq2 = string_copy(seq2);
+	if (aln1) A->aln1 = string_copy(aln1);
+	if (aln2) A->aln2 = string_copy(aln2);
 	/* do that with statistics here! */
 	return(A);
 }
@@ -1248,13 +1445,13 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 		if ((a = aln_alloc()) == NULL)
 			fprintf(stderr, "cannot allocate ALN\n"), exit(1);
 		a->len1 = len1;
-		a->seq1 = char_string(seq1);
+		a->seq1 = string_copy(seq1);
 		a->len2 = len2;
-		a->seq2 = char_string(seq2);
+		a->seq2 = string_copy(seq2);
 		a->start1 = o1 + 1, a->end1 = nk;	/* 1-based sequence start and end coordinates */
 		a->start2 = o2 + 1, a->end2 = nl;	/* 1-based sequence start and end coordinates */
-		a->aln1 = char_string(t1), free(t1);
-		a->aln2 = char_string(t2), free(t2);
+		a->aln1 = string_copy(t1), free(t1);
+		a->aln2 = string_copy(t2), free(t2);
 		a->plen = plen, a->alen = alen, a->mlen = mlen, a->glen = glen, a->ilen = ilen, a->olen = olen, a->clen = clen, a->nlen = nlen;
 		a->gapcost = gscore, a->ascore = mscore - gscore, a->mscore = mscore, a->mscore1 = mscore1, a->mscore2 = mscore2, a->mscorer = mscorer, a->aprime = natscore(ascore), a->mprime = natscore(mscore), a->ab = bitscore(ascore), a->mb = bitscore(mscore), a->zscore = zs, a->pscore = ps;
 
@@ -1280,7 +1477,7 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 	return(a);
 }
 
-int p_strict = 0;		/* set to 1, and no deviation is allowed in the recomputation of alignment score */
+int p_strict = 0;		/* 1 to allow no deviation in the recomputation of alignment score */
 
 void align_stats(ALN *A, int expected_plen, double expected_ascore)
 /* compute (missing) ALN statistics */
@@ -1401,7 +1598,7 @@ ALN *pair_msa(int fi, int fj)
 /* Return pairwise alignment of fasta entries fi vs fj interpolated/inferred from multiple sequence alignment */
 {
 	char *a1 = fseq[fi], *a2 = fseq[fj];
-	ALN *A = aln_obj(facc[fi], facc[fj], NULL, NULL, fseq[fi], fseq[fj]);
+	ALN *A = aln_obj(flab[fi], flab[fj], NULL, NULL, fseq[fi], fseq[fj]);
 	align_stats(A, -1, -1.0);
 	return(A);
 }
@@ -1416,8 +1613,8 @@ ALN *pair_sw(int fi, int fj)
 	double **sx = global_score_matrix, **mx = global_match_matrix;
 	double ascore = align_score(s1, s2, n1, n2, sx, mx, p_go, p_ge, &o1, &o2, align_flag);
 	ALN *A = align_ali(s1, s2, n1, n2, o1, o2, sx, mx, align_flag);
-	A->name1 = char_string(facc[fi]);
-	A->name2 = char_string(facc[fj]);
+	A->name1 = string_copy(flab[fi]);
+	A->name2 = string_copy(flab[fj]);
 	return(A);
 }
 
@@ -1434,11 +1631,11 @@ void align_fasta()
 		fprintf(stderr, "align_fasta: global_dmx is already allocated\n"), exit(1);
 	if (global_imx)
 		fprintf(stderr, "align_fasta: global_imx is already allocated\n"), exit(1);
-	global_dmx = double_matrix(g_nent, g_nent);
-	global_imx = double_matrix(g_nent, g_nent);
+	global_dmx = double_matrix(g_index, g_index);
+	global_imx = double_matrix(g_index, g_index);
 	ALN *A;
-	for (i = 0; i < g_nent; i++) {
-		for (j = (p_nonself ? i + 1 : i); j < g_nent; j++) {
+	for (i = 0; i < g_index; i++) {
+		for (j = (p_nonself ? i + 1 : i); j < g_index; j++) {
 			A =  (p_msa ? pair_msa(i, j) : pair_sw(i, j));
 			if (p_jaln)
 				aln_write_json(A);
@@ -1951,7 +2148,7 @@ void bnode_print_tree(FILE * fp, BNODE * B)
 		       (B->parent ? B->parent->left_distance : -999.9),
 		       (B->parent ? B->parent->right_distance : -999.9));
 	if (B->index >= 0)
-		fprintf(fp, "%s", facc[B->index]);
+		fprintf(fp, "%s", flab[B->index]);
 	else if (B->left && B->right) {
 		/* left */
 		fprintf(fp, "(");
@@ -2177,7 +2374,7 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 					(bvec[i]->right ? "def" : "undef"),
 					(bvec[i]->parent ? "def" : "undef"),
 					(bvec[i]->pos ? "def" : "undef"),
-					bvec[i]->index, facc[bvec[i]->index]);
+					bvec[i]->index, flab[bvec[i]->index]);
 		fprintf(stderr, "Fatal: m != nodes : n %d, m %d, nodes %d\n", n, m, nodes), exit(1);
 	}
 	if (!P)
@@ -2355,7 +2552,7 @@ BNODE *bnode_tree(double **pos, int *index, int n, int dim, double **dmx)
 					(bvec[i]->right ? "def" : "undef"),
 					(bvec[i]->parent ? "def" : "undef"),
 					(bvec[i]->pos ? "def" : "undef"),
-					bvec[i]->index, facc[bvec[i]->index]);
+					bvec[i]->index, flab[bvec[i]->index]);
 		fprintf(stderr, "Fatal: m != nodes : n %d, m %d, nodes %d\n", n, m, nodes), exit(1);
 	}
 	if (!P)
@@ -2575,12 +2772,12 @@ void write_dmx(char *oprefix)
 	int i, j, c;
 	if ((fp = fopen(filename, "w")) == NULL)
 		fprintf(stderr, "Distance file %s cannot be opened for writing\n", filename), exit(1);
-	for (c = 0, i = 0; i < g_nent; i++)
-		for (j = i; j < g_nent; j++, c++)
-			fprintf(fp, "%s %s %f\n", facc[i], facc[j], global_dmx[i][j]);
+	for (c = 0, i = 0; i < g_index; i++)
+		for (j = i; j < g_index; j++, c++)
+			fprintf(fp, "%s %s %f\n", flab[i], flab[j], global_dmx[i][j]);
 	fclose(fp);
 	fprintf(stderr, "Wrote dmx %s %d elements, expect N(N+1)/2 %d for N=%d\n",
-		filename, c, g_nent*(g_nent+1)/2, g_nent);
+		filename, c, g_index*(g_index+1)/2, g_index);
 	free(filename);
 }
 
@@ -2653,45 +2850,45 @@ int pparse(int argc, char *argv[])
 		else if (strncmp(argv[c], "-alf", 4) == 0) {
 			++c;
 			p_alf = (p_alf + 1) % 2;
-			fprintf(stderr, "alf flag set to %d\n", p_alf);
+			fprintf(stderr, "alf flag %d\n", p_alf);
 		}
 
 		/* flag to read distance matrix file input */
 		else if (strncmp(argv[c], "-dmx", 4) == 0) {
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
-			f_distancefile = char_string(argv[c++]);
-			fprintf(stderr, "f_distancefile set to '%s'\n", f_distancefile);
+			f_distancefile = string_copy(argv[c++]);
+			fprintf(stderr, "f_distancefile '%s'\n", f_distancefile);
 		}
 
 		else if (strncmp(argv[c], "-acc", 4) == 0) {
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
-			f_accessionsfile = char_string(argv[c++]);
-			fprintf(stderr, "accessions file set to '%s'\n", f_accessionsfile);
+			f_accessionsfile = string_copy(argv[c++]);
+			fprintf(stderr, "accessions file '%s'\n", f_accessionsfile);
 		}
 		else if (strncmp(argv[c], "-s", 2) == 0) {
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
-			f_scorematrixfile = char_string(argv[c++]);
-			fprintf(stderr, "scorematrix file set to '%s'\n", f_scorematrixfile);
+			f_scorematrixfile = string_copy(argv[c++]);
+			fprintf(stderr, "scorematrix file '%s'\n", f_scorematrixfile);
 		}
 		else if (strncmp(argv[c], "-p", 2) == 0) {
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
-			oprefix = char_string(argv[c++]);
-			fprintf(stderr, "output prefix set to '%s'\n", oprefix);
+			oprefix = string_copy(argv[c++]);
+			fprintf(stderr, "output prefix '%s'\n", oprefix);
 		}
 		else if (strncmp(argv[c], "-dave", 5) == 0) {
 			++c;
 			p_dave = (p_dave + 1) % 2;
-			fprintf(stderr, "distance averaging flag set to %d\n", p_dave);
+			fprintf(stderr, "distance averaging flag %d\n", p_dave);
 		}
 		else if (strncmp(argv[c], "-edim", 5) == 0) {
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
 			if (sscanf(argv[c], "%d", &p_edim) == 1)
-				fprintf(stderr, "embed dimension set to %d\n", p_edim);
+				fprintf(stderr, "embed dimension %d\n", p_edim);
 			else
 				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
 			c++;
@@ -2700,7 +2897,7 @@ int pparse(int argc, char *argv[])
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
 			if (sscanf(argv[c], "%c", &p_e) == 1)
-				fprintf(stderr, "Embed set to %c\n", p_e);
+				fprintf(stderr, "Embed %c\n", p_e);
 			else
 				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
 			c++;
@@ -2709,7 +2906,7 @@ int pparse(int argc, char *argv[])
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
 			if (sscanf(argv[c], "%lf", &p_go) == 1)
-				fprintf(stderr, "Gap open set to %g\n", p_go);
+				fprintf(stderr, "Gap open %g\n", p_go);
 			else
 				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
 			c++;
@@ -2718,7 +2915,7 @@ int pparse(int argc, char *argv[])
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
 			if (sscanf(argv[c], "%lf", &p_ge) == 1)
-				fprintf(stderr, "Gap extension set to %g\n", p_ge);
+				fprintf(stderr, "Gap extension %g\n", p_ge);
 			else
 				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
 			c++;
@@ -2727,7 +2924,7 @@ int pparse(int argc, char *argv[])
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
 			if (sscanf(argv[c], "%d", &p_gx) == 1)
-				fprintf(stderr, "Gap max crossover length set to %d\n", p_gx);
+				fprintf(stderr, "Gap max crossover length %d\n", p_gx);
 			else
 				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
 			c++;
@@ -2736,7 +2933,7 @@ int pparse(int argc, char *argv[])
 		else if (strncmp(argv[c], "-nonself", 8) == 0) {
 			++c;
 			p_nonself = (p_nonself + 1) % 2;
-			fprintf(stderr, "nonself flag set to %d\n", p_nonself);
+			fprintf(stderr, "nonself flag %d\n", p_nonself);
 		}
 		else if (strncmp(argv[c], "-metadata", 9) == 0) {
 			++c;
@@ -2761,12 +2958,12 @@ int pparse(int argc, char *argv[])
 		else if (strncmp(argv[c], "-v", 2) == 0) {
 			++c;
 			p_v++;
-			fprintf(stderr, "verbose flag set to %d\n", p_v);
+			fprintf(stderr, "verbose flag %d\n", p_v);
 		}
 		else if (strncmp(argv[c], "-h", 2) == 0) {
 			++c;
 			p_h++;
-			fprintf(stderr, "help flag set to %d\n", p_h);
+			fprintf(stderr, "help flag %d\n", p_h);
 		}
 
 		/* remaining '-' cases HERE */
@@ -2824,8 +3021,7 @@ void read_fasta_files(int argc, char *argv[], int cstart)
 	for (c = cstart; c < argc; c++) {
 		fprintf(stderr, " argv[%d], %s\n", c, argv[c]);
 		read_fasta(argv[c]);
-		fprintf(stderr, "read group %d %s, ns now %d\n", g_nsrc, argv[c], g_nent);
-		g_nsrc++;
+		fprintf(stderr, "read Fasta[%d] %s, index %d\n", c-cstart, argv[c], g_index);
 	}
 }
 
@@ -2836,21 +3032,12 @@ void explain_input_better(int argc, char *argv[], int cstart)
 		fprintf(stderr, "Input file(s) needed, expecting Fasta filenames\n"), exit(1);
 }
 
-int facc_index(char *word)
-{
-	int i; for (i = 0; i < g_nent; i++) if (strcmp(facc[i], word)==0) return i;
-	return -1;
-}
-
-/* remember MAXENTRIES 10000 int g_nent = 0; char *facc[MAXENTRIES]; */
-
 void read_alf(int argc, char *argv[], int cstart)
 /* read ALIGNFASTAS file by file, line by line, parse into global dmx and imx matrices */
 {
 	/* reset values of global counters and matrices altered by this subroutine */
-	g_nsrc = g_nent = 0;
 	global_dmx = global_imx = NULL;
-
+	DNODE *d1, *d2;
 	char line[MAXLINELEN], label1[MAXWORDLEN], label2[MAXWORDLEN];
 	FILE *fp;
 	int c, index1, index2, i, j;
@@ -2866,15 +3053,13 @@ void read_alf(int argc, char *argv[], int cstart)
 				continue;
 			if (sscanf(line, "%s", label1) != 1)
 				fprintf(stderr, "Could not sscanf label from line >>%s<<\n", line), exit(1);
-			/* return or assign accession indices */
-			while((index1 = facc_index(label1)) < 0)
-				facc[g_nent++] = char_string(label1);
+			d1 = dnode_locate_or_create(label1, NULL);
 			if (p_v)
-				fprintf(stderr, "accession label %d label %s\n", facc_index(label1), label1);
+				fprintf(stderr, "label %s index %d\n", label1, d1->index);
 		}
-		fprintf(stderr, "Accessions count %d\n", g_nent);
+		fprintf(stderr, "Accessions count %d\n", g_index);
 		fclose(fp);
-		subset = g_nent;
+		subset = g_index;
 	}
 	/* allocate tmp matrices for pairwise distance, which is used in tree building,
 	   and pairwise alignment percent identity which is used later in tree branch metadata.
@@ -2883,8 +3068,8 @@ void read_alf(int argc, char *argv[], int cstart)
 		fprintf(stderr, "could not allocate tmp_dmx double_matrix %d x %d\n", MAXENTRIES, MAXENTRIES), exit(1);
 	if ((tmp_imx = double_matrix(MAXENTRIES, MAXENTRIES)) == NULL)
 		fprintf(stderr, "could not allocate tmp_imx double_matrix %d x %d\n", MAXENTRIES, MAXENTRIES), exit(1);
-	for (i = 0; i < g_nent; i++)
-	for (j = 0; j < g_nent; j++)
+	for (i = 0; i < g_index; i++)
+	for (j = 0; j < g_index; j++)
 		tmp_dmx[i][j] = tmp_imx[i][j] = -99.0;
 	int parsed = 0, skipped = 0, included = 0;
 	for (c = cstart; c < argc; c++) {
@@ -2898,42 +3083,39 @@ void read_alf(int argc, char *argv[], int cstart)
 				label1, label2, &pctid, &sdist) != 4)
 				fprintf(stderr, "Could not sscanf label1, label2, pctid, sdist from line >>%s<<\n", line), exit(1);
 			parsed++;
-			if (subset && ((index1 = facc_index(label1)) < 0 || (index2 = facc_index(label2)) < 0)) {
+			if (subset && ((index1 = flab_index(label1)) < 0 || (index2 = flab_index(label2)) < 0)) {
 				skipped++;
 				continue;
 			} else {
 				included++;
-				while((index1 = facc_index(label1)) < 0)
-					facc[g_nent++] = char_string(label1);
-				while((index2 = facc_index(label2)) < 0)
-					facc[g_nent++] = char_string(label2);
+				d1 = dnode_locate_or_create(label1, NULL), index1 = d1->index;
+				d2 = dnode_locate_or_create(label2, NULL), index2 = d2->index;
 			}
 			if (p_v)
-				fprintf(stderr, "parsed %d skipped %d included %d : g_nent %d label1 %s index %d label2 %s index %d pctid %g sdist %g\n",
+				fprintf(stderr, "parsed %d skipped %d included %d : g_index %d label1 %s index %d label2 %s index %d pctid %g sdist %g\n",
 					parsed, skipped, included,
-					g_nent, label1, facc_index(label1), label2, facc_index(label2), pctid, sdist);
+					g_index, label1, flab_index(label1), label2, flab_index(label2), pctid, sdist);
 			tmp_imx[index1][index2] = tmp_imx[index2][index1] = 100.0 * pctid;
 			tmp_dmx[index1][index2] = tmp_dmx[index2][index1] = sdist;
 		}
 		fclose(fp);
-		g_nsrc++;
 	}
-	fprintf(stderr, "Read_alignfastas %d labels, %d alignfastafiles, %d parsed %d skipped %d included\n",
-			g_nent, g_nsrc, parsed, skipped, included);
+	fprintf(stderr, "Read_alignfastas %d labels, lines parsed %d, skipped %d, included %d\n",
+			g_index, parsed, skipped, included);
 	/* allocate global distance and percent identity matrices */
-	if ((global_dmx = double_matrix(g_nent, g_nent)) == NULL)
-		fprintf(stderr, "could not allocate global_dmx double_matrix %d x %d\n", g_nent, g_nent), exit(1);
-	if ((global_imx = double_matrix(g_nent, g_nent)) == NULL)
-		fprintf(stderr, "could not allocate global_imx double_matrix %d x %d\n", g_nent, g_nent), exit(1);
+	if ((global_dmx = double_matrix(g_index, g_index)) == NULL)
+		fprintf(stderr, "could not allocate global_dmx double_matrix %d x %d\n", g_index, g_index), exit(1);
+	if ((global_imx = double_matrix(g_index, g_index)) == NULL)
+		fprintf(stderr, "could not allocate global_imx double_matrix %d x %d\n", g_index, g_index), exit(1);
 	/* fill in global matrices from tmp matrices, and test for undefined values */
 	int undefined = 0;
-	for (i = 0; i < g_nent; i++)
-	for (j = 0; j < g_nent; j++) {
+	for (i = 0; i < g_index; i++)
+	for (j = 0; j < g_index; j++) {
 		global_dmx[i][j] = tmp_dmx[i][j];
 		global_imx[i][j] = tmp_imx[i][j];
 		if (global_dmx[i][j] < -0.0) {
 			fprintf(stderr, "labels %s %s dmx[ %d ][ %d ] < -0.0 %lf\n",
-				facc[i], facc[j], i, j, global_dmx[i][j]);
+				flab[i], flab[j], i, j, global_dmx[i][j]);
 			undefined += 1;
 		}
 	}
@@ -2941,7 +3123,7 @@ void read_alf(int argc, char *argv[], int cstart)
 		fprintf(stderr, "Undefined distance matrix elements, program halted.\n"), exit(1);
 	double_matrix_free(MAXENTRIES, MAXENTRIES, tmp_dmx);
 	double_matrix_free(MAXENTRIES, MAXENTRIES, tmp_imx);
-	fprintf(stderr, "Read %d indices from %d source files\n", g_nent, g_nsrc);
+	fprintf(stderr, "Read %d labels\n", g_index);
 }
 
 void read_dmx(char *filename)
@@ -2951,10 +3133,10 @@ void read_dmx(char *filename)
 	 * second to parse and fill in the allocated distance matrix.
 	 */
 {
-	g_nent = 0;
 	fprintf(stderr, "Read Distance matrix from file %s\n", filename);
-	char line[MAXLINELEN], word1[MAXWORDLEN], word2[MAXWORDLEN];
+	char line[MAXLINELEN], label1[MAXWORDLEN], label2[MAXWORDLEN];
 	float value;
+	DNODE *d1, *d2;
 	int index1, index2;
 	FILE *fp = fopen(filename, "r");
 	if (!fp) fprintf(stderr, "Could not open filename %s r mode\n", filename), exit(1);
@@ -2962,40 +3144,38 @@ void read_dmx(char *filename)
 	{
 		if (strlen(line) == 0 || line[0] == '#')
 			continue;
-		if (sscanf(line, "%s %s %f", word1, word2, &value) != 3)
-			fprintf(stderr, "Could not sscanf word1, word2, value line >>%s<<\n", line), exit(1);
-		while((index1 = facc_index(word1)) < 0)
-			facc[g_nent++] = char_string(word1);
-		while((index2 = facc_index(word2)) < 0)
-			facc[g_nent++] = char_string(word2);
-		/* fprintf(stderr, "g_nent %d word1 %s index %d word2 %s index %d value %g\n", g_nent, word1, facc_index(word1), word2, facc_index(word2), value); */
+		if (sscanf(line, "%s %s %f", label1, label2, &value) != 3)
+			fprintf(stderr, "Could not sscanf label1, label2, value line >>%s<<\n", line), exit(1);
+		d1 = dnode_locate_or_create(label1, NULL), index1 = d1->index;
+		d2 = dnode_locate_or_create(label2, NULL), index2 = d2->index;
 	}
 	fclose(fp);
 
 	/* allocate global distance and percent identity matrices */
-	global_dmx = double_matrix(g_nent, g_nent);
+	global_dmx = double_matrix(g_index, g_index);
 	global_imx = NULL; /* TODO add additional arguments to enable read of pct id matrix */
 	int i, j;
-	for (i = 0; i < g_nent; i++)
-		for (j = i;  j < g_nent; j++)
+	for (i = 0; i < g_index; i++)
+		for (j = i;  j < g_index; j++)
 			global_dmx[i][j] = global_dmx[j][i] = -99.0;
 
-	/* Reopen the file and rescan the data. Simply faster than recording it the first time */
+	/* Reopen the file and rescan the data. Simply faster than recording it the first time
+		NOT TRUE RIPE FOR REFACTOR */
 	fp = fopen(filename, "r");
 	if (!fp) fprintf(stderr, "Could not open filename %s r mode the second time !!\n", filename), exit(1);
 	while (fgets(line, sizeof(line), fp) != NULL)
 	{
 		if (strlen(line) == 0 || line[0] == '#')
 			continue;
-		if (sscanf(line, "%s %s %f", word1, word2, &value) != 3)
-			fprintf(stderr, "Could not sscanf word1, word2, value line >>%s<<\n", line), exit(1);
-		if((index1 = facc_index(word1)) < 0)
-			fprintf(stderr, "Unexpected that word >>%s<< is not on facc list g_nent %d\n", word1, g_nent), exit(1);
-		if((index2 = facc_index(word2)) < 0)
-			fprintf(stderr, "Unexpected that word >>%s<< is not on facc list g_nent %d\n", word2, g_nent), exit(1);
+		if (sscanf(line, "%s %s %f", label1, label2, &value) != 3)
+			fprintf(stderr, "Could not sscanf label1, label2, value line >>%s<<\n", line), exit(1);
+		if((index1 = flab_index(label1)) < 0)
+			fprintf(stderr, "Unexpected that label >>%s<< is not on flab list g_index %d\n", label1, g_index), exit(1);
+		if((index2 = flab_index(label2)) < 0)
+			fprintf(stderr, "Unexpected that label >>%s<< is not on flab list g_index %d\n", label2, g_index), exit(1);
 		if (global_dmx[index1][index2] > -90.0)
-			fprintf(stderr, "Unexpected duplicate word1 %s index1 %d word2 %s index2 %d g_nent %d\n",
-				word1, index1, word2, index2, g_nent), exit(1);
+			fprintf(stderr, "Unexpected duplicate label1 %s index1 %d label2 %s index2 %d g_index %d\n",
+				label1, index1, label2, index2, g_index), exit(1);
 		global_dmx[index1][index2] = global_dmx[index2][index1] = value;
 	}
 	fclose(fp);
@@ -3007,13 +3187,13 @@ int main(int argc, char *argv[])
 	int ctime = clocktime(0);
 	int c = pparse(argc, argv);
 	if (!oprefix)
-		oprefix = char_string("this");
+		oprefix = string_copy("this");
 	if (c == 1)
 		explain_input_better(argc, argv, c);
 	if (!oprefix)
-		oprefix = char_string(argv[c]);
+		oprefix = string_copy(argv[c]);
 
-	fprintf(stderr, "oprefix set to %s\n", oprefix);
+	fprintf(stderr, "oprefix %s\n", oprefix);
 
 	double **dmx = NULL;
 
@@ -3030,7 +3210,7 @@ int main(int argc, char *argv[])
 	else {
 		/* compute dmx from computed or interpolated pairwise alignments */
 		if (!f_scorematrixfile)
-			f_scorematrixfile = char_string(DEFAULT_SCORE_MATRIX);
+			f_scorematrixfile = string_copy(DEFAULT_SCORE_MATRIX);
 		read_scorematrix(f_scorematrixfile);
 		read_fasta_files(argc, argv, c);
 		align_fasta();
@@ -3038,10 +3218,10 @@ int main(int argc, char *argv[])
 			write_dmx(oprefix);
 	}
 	/* test the distance matrix for 'holes' */
-	fprintf(stderr, "Got DMX with %d entries, scanning for possible holes...\n", g_nent);
+	fprintf(stderr, "Got DMX with %d entries, scanning for possible holes...\n", g_index);
 	int i, j, neg = 0;
-	for (i = 0; i < g_nent; i++) {
-		for (j = 0; j < g_nent; j++) {
+	for (i = 0; i < g_index; i++) {
+		for (j = 0; j < g_index; j++) {
 			if ( global_dmx[i][j] < -0.0 ) {
 				fprintf(stderr, "Negative i, j %d %d v %g\n", i, j, dmx[i][j]);
 				neg++;
@@ -3053,7 +3233,7 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "Distance matrix complete\n");
 
 	/* Construct tree based on distance matrix alone. */
-	BNODE *dree = bnode_distance_tree(g_nent, global_dmx);
+	BNODE *dree = bnode_distance_tree(g_index, global_dmx);
 	char *treefile = char_vector(strlen(oprefix) + strlen(".dree.txt") + 1);
 	sprintf(treefile, "%s%s", oprefix, ".dree.txt");
 	write_tree(dree, treefile);
@@ -3064,7 +3244,7 @@ int main(int argc, char *argv[])
 	free(treefile);
 
 	/* Continue with tree based on single pass embedding. */
-	BNODE *tree = bnode_embed_tree(g_nent, global_dmx);
+	BNODE *tree = bnode_embed_tree(g_index, global_dmx);
 	treefile = char_vector(strlen(oprefix) + strlen(".tree0.txt") + 1);
 	sprintf(treefile, "%s%s", oprefix, ".tree0.txt");
 	write_tree(tree, treefile);
@@ -3075,8 +3255,8 @@ int main(int argc, char *argv[])
 	free(treefile);
 
 	/* Continue with tree based on full recursive embedding. */
-	tree->left = bnode_reembed(tree->left, 'L', global_dmx, g_nent, p_edim);
-	tree->right = bnode_reembed(tree->right, 'R', global_dmx, g_nent, p_edim);
+	tree->left = bnode_reembed(tree->left, 'L', global_dmx, g_index, p_edim);
+	tree->right = bnode_reembed(tree->right, 'R', global_dmx, g_index, p_edim);
 	treefile = char_vector(strlen(oprefix) + strlen(".tree.txt") + 1);
 	sprintf(treefile, "%s%s", oprefix, ".tree.txt");
 	write_tree(tree, treefile);
