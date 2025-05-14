@@ -354,7 +354,7 @@ void double_vector_free(int n, double *v)
 double **double_matrix(int ni, int nj)
 {
 /* return double ** matrix having dimensions ni * nj
-// but leave second dimension unallocated if nj <= 0 */
+   but leave second dimension unallocated if nj <= 0 */
 	double **m;
 	int i, j;
 	if ((m = (double **)malloc(ni * sizeof(double *))) == NULL)
@@ -416,7 +416,7 @@ char *string_copy(char *str)
 char **char_matrix(int ni, int nj)
 {
 /* return char ** matrix having dimensions ni * nj
-// but leave second dimension unallocated if nj <= 0 */
+   but leave second dimension unallocated if nj <= 0 */
 	char **m;
 	int i, j;
 	if ((m = (char **)malloc(ni * sizeof(char *))) == NULL)
@@ -470,7 +470,7 @@ void int_vector_free(int n, int *v)
 int **int_matrix(int ni, int nj)
 {
 /* allocate integer matrix having dimensions ni * nj
-// but leave second dimension unallocated if nj <= 0 */
+   but leave second dimension unallocated if nj <= 0 */
 	int **m;
 	int i, j;
 	if ((m = (int **)malloc(ni * sizeof(int *))) == NULL)
@@ -639,8 +639,8 @@ void print_scorematrix()
 void read_scorematrix(char *filename)
 {
 /* READ BLOSUM62 amino-acid substitution score matrix, and alphabet from a file
-// in the very specific format provided with this source code.
-// allocates and assigned global variables blosum_mtx, nb and alphabet */
+   in the very specific format provided with this source code.
+   allocates and assigned global variables blosum_mtx, nb and alphabet */
 	char line[MAXLINELEN], text[MAXLINELEN];
 	int lineno = 0;
 	FILE *fp;
@@ -1473,21 +1473,21 @@ ALN *align_ali(char *seq1, char *seq2, int len1, int len2, int o1, int o2, doubl
 
 		/* compute score distances */
 
-		//normalized to shortest sequence length
-			int minlen = (len1 < len2 ? len1 : len2);
+		/* normalized to shortest sequence length */
+		int minlen = (len1 < len2 ? len1 : len2);
 		double scale = (double)minlen / (double)mlen;
 		a->sd = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
 
-		//normalized to sequence1 length
-			scale = (double)len1 / (double)mlen;
+		/* normalized to sequence1 length */
+		scale = (double)len1 / (double)mlen;
 		a->sd1 = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
 
-		//normalize to sequence2 length
-			scale = (double)len2 / (double)mlen;
+		/* normalize to sequence2 length */
+		scale = (double)len2 / (double)mlen;
 		a->sd2 = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
 
-		//normalize to alignment length(original Sohnhammer Scoredist)
-			scale = (double)alen / (double)mlen;
+		/* normalize to alignment length (original Sohnhammer Scoredist) */
+		scale = (double)alen / (double)mlen;
 		a->sd0 = compute_scoredistance(mscore, mscorer, mscore1, mscore2, scale);
 	}
 	return (a);
@@ -1503,29 +1503,21 @@ void align_stats(ALN * A, int expected_plen, double expected_ascore)
 	if (A->aln2 == NULL)
 		fprintf(stderr, "align_stats A->aln2 == NULL\n"), exit(1);
 
-	//plen = count total(padded + gapped) length of alignment
-		if ((A->plen = strlen(A->aln1)) != strlen(A->aln2))
+	/* plen = count total (padded + gapped) length of alignment */
+	if ((A->plen = strlen(A->aln1)) != strlen(A->aln2))
 		fprintf(stderr, "strlen(A->aln1) %ld != strlen(A->aln2) %ld\n%s\n%s\n", strlen(A->aln1), strlen(A->aln2), A->aln1, A->aln2), exit(1);
 
-	//I forgot the use case for testing
-		plen == expected_plen...
-			if (expected_plen > 0 && A->plen != expected_plen)
-			fprintf(stderr, "A->plen %d != expected_plen %d\n", A->plen, expected_plen), exit(1);
+	/* I forgot the use case for testing plen == expected_plen ... */
+	if (expected_plen > 0 && A->plen != expected_plen)
+		fprintf(stderr, "A->plen %d != expected_plen %d\n", A->plen, expected_plen), exit(1);
 
-	//alen = count aligned positions
-		// mlen = count matched positions
-		// ilen = count identical positions
-		// glen = count gap positions
-		// olen = count gap openings
-		// clen = count conservative matches(score > 0)
-		// nlen = count non - negative matches(score >= 0)
-		// ascore = sum alignment match score minus total gap cost
-		// mscore = sum alignment match score
-		// mscore1 = sum sequence1 match score over aligned region
-		// mscore2 = sum sequence2 match score over aligned region
-		// mscorer = sum alignment random match score * /
-		//o1, o2 = 1 - based sequence offsets to start of local alignment
-		int i, isg = 0, o1 = -1, o2 = -1, n1 = 0, n2 = 0;
+	/* alen = count aligned positions. mlen = count matched positions. ilen = count identical positions. glen = count
+	gap positions. olen = count gap openings. clen = count conservative matches(score > 0). nlen = count non -
+	negative matches(score >= 0). ascore = sum alignment = match score minus total gap cost. mscore = sum alignment
+	match score. mscore1 = sum sequence1 match score over aligned region. mscore2 = sum sequence2 match score over
+	aligned region. mscorer = sum alignment random match score. o1, o2 = 1 - based sequence offsets to start of local
+	alignment */
+	int i, isg = 0, o1 = -1, o2 = -1, n1 = 0, n2 = 0;
 
 	/* compute gaps and match scores from the alignment strings */
 	double sum_score = 0.0;
@@ -1774,7 +1766,7 @@ void double_vector_scale(int n, double *v, double scale)
 double **embed_dmx(int n, double **d)
 {
 /* N-dimensional embedding of distance matrix using metric matrix distance geometry.
-// (Crippen & Havel, 1988, p 311). Uses matrix exhaustion and matrix deflation. */
+  (Crippen & Havel, 1988, p 311). Uses matrix exhaustion and matrix deflation. */
 	int i, j;
 	double **mx = metric_matrix(n, d);	/* metric matrix (dot products of COM vectors) */
 	double **v = double_matrix(p_edim, n);	/* eigenvectors (dim x n) */
@@ -2213,8 +2205,8 @@ void bnode_print(FILE * fp, BNODE * B)
 void bnode_bnodei(BNODE * B, BNODE * *bnode, int *i)
 {
 /* recursive assign ith value of bnode vector to tree-ordered leaf node
-// DO NOT DELETE the indirectly-allocated bnode in the usual way as it
-// might also delete parts of the tree it points to */
+   DO NOT DELETE the indirectly-allocated bnode in the usual way as it
+   might also delete parts of the tree it points to */
 	if (B->index >= 0)
 		bnode[(*i)++] = B;
 	else if (B->left && B->right) {
@@ -2426,11 +2418,10 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 BNODE *bnode_tree(double **pos, int *index, int n, int dim, double **dmx)
 {
 
-	/* algorithm: // allocate BNODE vector of length 2N-1, with N of them with 'natural' index numbers (leaf nodes)
-	// and N-1 of them with index number -1 (tree nodes) without assigning any of them parentage. // allocate
-	integer 'use' vector of length 2N-1, // alternatively double 'weight' vector of length 2N-1, 1.0 for leafs 0.0
-	for others... // allocate dmatrix of length 2N-1 x 2N-1, with first N positions taken by actual distances //
-	find the minimum non-used element in the matrix, join the nodes. */
+	/* algorithm: allocate BNODE vector with 2N-1 total nodes: N leaf nodes plus N-1 internal nodes. allocate
+	integer 'use' vector of length 2N-1, (alternatively 'weight' vector of length 2N-1: 1.0 for leafs 0.0 for
+	others...) allocate dmatrix of length 2N-1 x 2N-1, with first N positions taken by actual distances find the
+	minimum non-used element in the matrix, join the nodes. */
 
 	int nodes = 2 * n - 1;
 	if (nodes > MAXNODES)
@@ -2771,8 +2762,8 @@ BNODE *bnode_reembed(BNODE * B, char br, double **odmx, int on, int dim)
 		else
 			fprintf(stderr, "bnode_reembed, unknown branch rotation br '%c'\n", br), exit(1);
 	}
-	/* note - do not change P->parent->{left,right}_distance // as they are determined by a 'higher' level
-	embedding // recursively apply this to left and right subbranches */
+	/* note - do not change P->parent->{left,right}_distance as they are determined by a 'higher' level embedding
+	recursively apply this to left and right subbranches */
 
 	P->left = bnode_reembed(P->left, 'L', odmx, on, dim);
 	P->right = bnode_reembed(P->right, 'R', odmx, on, dim);
@@ -2826,12 +2817,12 @@ BNODE *bnode_distance_tree(int n, double **dmx)
 }
 
 /* After
-// 1. alignments have now provided a distance matrix
-// The the task of tree building can begin
-// 2. embed distance matrix into orthogonal coordinates,
-// 3. build binary tree based on nearest neighbor-joining algorithm.
-// 4. recursively visit each sub-branch and redo embed+tree (steps 2 and 3).
-// Garry Paul Gippert.
+   1. alignments have now provided a distance matrix
+      The the task of tree building can begin
+   2. embed distance matrix into orthogonal coordinates,
+   3. build binary tree based on nearest neighbor-joining algorithm.
+   4. recursively visit each sub-branch and redo embed+tree (steps 2 and 3).
+   Garry Paul Gippert.
 */
 
 BNODE *bnode_embed_tree(int n, double **dmx)
