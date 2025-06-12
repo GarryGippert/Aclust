@@ -1,4 +1,5 @@
-BIN = $(HOME)/bin/`arch`
+#BIN = $(HOME)/bin/`arch`
+BIN = /work3/garryg/bioC/bin/`arch`
 VERSION = `git log -n 1 --pretty="format:%h %ci"`
 LFLAGS = -lm
 EXE = aclust
