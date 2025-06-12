@@ -779,7 +779,6 @@ void dnode_traverse(char *w, DNODE * p, int n)
 
 	/* count terminal dnodes */
 	if (t == MAXCHAR - MINCHAR + 1) {
-#define FREENTERM
 #ifdef FREENTERM
 		/* I SO want to eliminate dangling letter pointers at word termini. but the proper place to do it is in
 		the allocation step. besides the space needed for all these many extra pointers is - though a
@@ -2062,7 +2061,9 @@ void between(double **mx, int n, int *index, int m, int *jndex, double *ave, dou
 {
 /* average and population standard deviation between points in two sets (n, index) vs (m, jndex)
  * from matrix elements */
-	*ave = *sd = 0.0;
+	*ave = *sd = -99.9;
+	if (mx == NULL)
+		return;
 	double val, sum = 0.0, cnt = 0.0, sqr = 0.0;
 	int i, j;
 	for (i = 0; i < n; i++)
@@ -2082,7 +2083,9 @@ void within(double **mx, int n, int *index, double *ave, double *sd)
 {
 /* average and population standard deviation among points in a set (n, index)
  * from matrix elements */
-	*ave = *sd = 0.0;
+	*ave = *sd = -99.9;
+	if (mx == NULL)
+		return;
 	double val, sum = 0.0, cnt = 0.0, sqr = 0.0;
 	int i, j;
 	for (i = 0; i < n; i++)
@@ -2117,23 +2120,27 @@ void bnode_print_metadata(FILE * fp, BNODE * left, BNODE * right)
 	bnode_indexi(left, kndex, &k);
 	bnode_indexi(right, kndex, &k);
 
-	double apct, sd_apct;
-	within(global_imx, o, kndex, &apct, &sd_apct);
+	/* tree metadata reports average and standard deviation of percent identity and distance */
+	double apct, sd_apct, adis, sd_adis;
+	double bpct, sd_bpct, bdis, sd_bdis;
 
-	double adis, sd_adis;
-	within(global_dmx, o, kndex, &adis, &sd_adis);
-
-	/* report average pct, identity and standard deviations of these within the entire branch */
-	fprintf(fp, "[&apct=%.1f,adis=%.1f,sd_apct=%.1f,sd_adis=%.1f", apct, adis, sd_apct, sd_adis);
-
-	double bpct, sd_bpct;
-	between(global_imx, n, index, m, jndex, &bpct, &sd_bpct);
-
-	double bdis, sd_bdis;
-	between(global_dmx, n, index, m, jndex, &bdis, &sd_bdis);
-
-	/* report average pct, identity and standard deviations of these between left and right branches */
-	fprintf(fp, ",bpct=%.1f,bdis=%.1f,sd_bpct=%.1f,sd_bdis=%.1f]", bpct, bdis, sd_bpct, sd_bdis);
+	if (global_imx != NULL) {
+		/* all pairwise WITHIN a branch */
+		within(global_imx, o, kndex, &apct, &sd_apct);
+		within(global_dmx, o, kndex, &adis, &sd_adis);
+		fprintf(fp, "[&apct=%.1f,adis=%.1f,sd_apct=%.1f,sd_adis=%.1f", apct, adis, sd_apct, sd_adis);
+		/* all pairwise BETWEEN left and right branches */
+		between(global_imx, n, index, m, jndex, &bpct, &sd_bpct);
+		between(global_dmx, n, index, m, jndex, &bdis, &sd_bdis);
+		fprintf(fp, ",bpct=%.1f,bdis=%.1f,sd_bpct=%.1f,sd_bdis=%.1f]", bpct, bdis, sd_bpct, sd_bdis);
+	} else {
+		/* all pairwise WITHIN a branch */
+		within(global_dmx, o, kndex, &adis, &sd_adis);
+		fprintf(fp, "[adis=%.1f,sd_adis=%.1f", adis, sd_adis);
+		/* all pairwise BETWEEN left and right branches */
+		between(global_dmx, n, index, m, jndex, &bdis, &sd_bdis);
+		fprintf(fp, ",bdis=%.1f,sd_bdis=%.1f]", bdis, sd_bdis);
+	}
 
 #ifdef DEBUG
 	/* print out all indices and lists and inspect once visually to make sure code works */
@@ -2245,6 +2252,9 @@ BNODE *bnode_tree_dmx(int n, int *index, double **dmx, int dmx_flag)
 	int nodes = 2 * n - 1;
 	if (nodes > MAXNODES)
 		fprintf(stderr, "bnode_tree: nodes %d > MAXNODES %d\n", nodes, MAXNODES), exit(1);
+
+	if (p_v)
+		fprintf(stderr, "Nodes %d\n", nodes);
 
 	int *lindex = int_vector(nodes), nl, *rindex = int_vector(nodes), nr;
 	BNODE **bvec = bnode_vec(nodes, 1);
