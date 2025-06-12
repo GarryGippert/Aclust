@@ -2103,6 +2103,9 @@ void within(double **mx, int n, int *index, double *ave, double *sd)
 
 void bnode_print_metadata(FILE * fp, BNODE * left, BNODE * right)
 {
+	if (! p_metadata)
+		return;
+
 /* print metadata comparing left and right branches */
 	/* leaf nodes in left subtree */
 	int n = bnode_count(left);
@@ -2124,39 +2127,35 @@ void bnode_print_metadata(FILE * fp, BNODE * left, BNODE * right)
 	double apct, sd_apct, adis, sd_adis;
 	double bpct, sd_bpct, bdis, sd_bdis;
 
-	if (global_imx != NULL) {
-		/* all pairwise WITHIN a branch */
-		within(global_imx, o, kndex, &apct, &sd_apct);
-		within(global_dmx, o, kndex, &adis, &sd_adis);
-		fprintf(fp, "[&apct=%.1f,adis=%.1f,sd_apct=%.1f,sd_adis=%.1f", apct, adis, sd_apct, sd_adis);
-		/* all pairwise BETWEEN left and right branches */
-		between(global_imx, n, index, m, jndex, &bpct, &sd_bpct);
-		between(global_dmx, n, index, m, jndex, &bdis, &sd_bdis);
-		fprintf(fp, ",bpct=%.1f,bdis=%.1f,sd_bpct=%.1f,sd_bdis=%.1f]", bpct, bdis, sd_bpct, sd_bdis);
-	} else {
-		/* all pairwise WITHIN a branch */
-		within(global_dmx, o, kndex, &adis, &sd_adis);
-		fprintf(fp, "[adis=%.1f,sd_adis=%.1f", adis, sd_adis);
-		/* all pairwise BETWEEN left and right branches */
-		between(global_dmx, n, index, m, jndex, &bdis, &sd_bdis);
-		fprintf(fp, ",bdis=%.1f,sd_bdis=%.1f]", bdis, sd_bdis);
+	/* all pairwise WITHIN a branch */
+	within(global_imx, o, kndex, &apct, &sd_apct);
+	within(global_dmx, o, kndex, &adis, &sd_adis);
+
+	fprintf(fp, "[&");
+	if (global_imx)
+		fprintf(fp, "apct=%.1f,", apct);
+	fprintf(fp, "adis=%.1f,", adis);
+	if (p_metadata > 1) {
+		if (global_imx)
+			fprintf(fp, "sd_apct=%.1f,", sd_apct);
+		fprintf(fp, "sd_adis=%.1f,", sd_adis);
 	}
 
-#ifdef DEBUG
-	/* print out all indices and lists and inspect once visually to make sure code works */
-	printf("N %d :", n);
-	for (i = 0; i < n; i++)
-		printf(" (%d,%d)", i, index[i]);
-	printf("\n");
-	printf("M %d :", m);
-	for (j = 0; j < m; j++)
-		printf(" (%d,%d)", j, jndex[j]);
-	printf("\n");
-	printf("O %d :", o);
-	for (k = 0; k < o; k++)
-		printf(" (%d,%d)", k, kndex[k]);
-	printf("\n");
-#endif
+	/* all pairwise BETWEEN left and right branches */
+	between(global_imx, n, index, m, jndex, &bpct, &sd_bpct);
+	between(global_dmx, n, index, m, jndex, &bdis, &sd_bdis);
+
+	if (global_imx)
+		fprintf(fp, "bpct=%.1f,", bpct);
+	fprintf(fp, "bdis=%.1f,", bdis);
+	if (p_metadata > 1) {
+		if (global_imx)
+			fprintf(fp, "sd_bpct=%.1f,", sd_bpct);
+		fprintf(fp, "sd_bdis=%.1f,", sd_bdis);
+	}
+	/* TODO: use join to solve the dangling-comma problem */
+	fprintf(fp, "]");
+
 	free((char *)index);
 	free((char *)jndex);
 	free((char *)kndex);
@@ -2195,8 +2194,7 @@ void bnode_print_tree(FILE * fp, BNODE * B)
 		if (PRINTNL)
 			fprintf(fp, "\n");
 		fprintf(fp, ")");
-		if (p_metadata)
-			bnode_print_metadata(fp, B->left, B->right);
+		bnode_print_metadata(fp, B->left, B->right);
 	}
 }
 
@@ -2965,16 +2963,20 @@ int pparse(int argc, char *argv[])
 				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
 			c++;
 		}
+		else if (strncmp(argv[c], "-metadata", 9) == 0) {
+			if (++c == argc)
+				parameter_value_missing(c, argc, argv);
+			if (sscanf(argv[c], "%d", &p_metadata) == 1)
+				fprintf(stderr, "Metadata level %d\n", p_metadata);
+			else
+				fprintf(stderr, "Could not parse metadata level argv[%d] '%s'\n", c, argv[c]), exit(1);
+			c++;
+		}
 		/* switch ON <-> OFF */
 		else if (strncmp(argv[c], "-nonself", 8) == 0) {
 			++c;
 			p_nonself = (p_nonself + 1) % 2;
 			fprintf(stderr, "nonself flag %d\n", p_nonself);
-		}
-		else if (strncmp(argv[c], "-metadata", 9) == 0) {
-			++c;
-			p_metadata = (p_metadata + 1) % 2;
-			fprintf(stderr, "write node metadata %d\n", p_metadata);
 		}
 		else if (strncmp(argv[c], "-jaln", 5) == 0) {
 			++c;
@@ -3033,7 +3035,7 @@ int pparse(int argc, char *argv[])
 	fprintf(stderr, " -p %s	prefix for output files\n", oprefix);
 	fprintf(stderr, " -jaln		flag write json alignments (%d)\n", p_jaln);
 	fprintf(stderr, " -taln		flag write text alignments (%d)\n", p_taln);
-	fprintf(stderr, " -metadata	tree includes metadata distance/pctid (%d)\n", p_metadata);
+	fprintf(stderr, " -metadata %d	tree metadata distance/pctid [0-2]\n", p_metadata);
 	fprintf(stderr, " -v		verbose stdout and/or stderr (%d)\n", p_v);
 	fprintf(stderr, " -h		show help and quit (%d)\n", p_h);
 	if (p_h) {
