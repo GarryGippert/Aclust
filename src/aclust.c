@@ -1528,6 +1528,13 @@ void align_stats(ALN * A, int expected_plen, double expected_ascore)
 			n1++;
 		if (b != ALIGN_PAD_CHAR && b != ALIGN_GAP_CHAR)
 			n2++;
+		/* alignment start/end coordinates (1-based) at first and last match position, respectively */
+		if (a != ALIGN_PAD_CHAR && a != ALIGN_GAP_CHAR && b != ALIGN_PAD_CHAR && b != ALIGN_GAP_CHAR) {
+			if (A->start1 < 0 && A->start2 < 0)
+				A->start1 = n1, A->start2 = n2;
+			A->end1 = n1, A->end2 = n2;
+		}
+		/* compute SS value before necessary, so it's available for verbose print */
 		double s = scorematrix_element(a, b);
 		if (p_v) {
 			printf("p_go %g x olen %d + p_ge %g x (glen %d - olen %d)\n", p_go, A->olen, p_ge, A->glen, A->olen);
@@ -1541,9 +1548,6 @@ void align_stats(ALN * A, int expected_plen, double expected_ascore)
 		if (a == ALIGN_PAD_CHAR || b == ALIGN_PAD_CHAR)
 			continue;
 		/* aligned positions */
-		/* set offsets */
-		if (o1 < 0)
-			o1 = n1, o2 = n2;
 		A->alen++;
 		if (a == ALIGN_GAP_CHAR || b == ALIGN_GAP_CHAR) {
 			A->glen++;
@@ -1570,8 +1574,6 @@ void align_stats(ALN * A, int expected_plen, double expected_ascore)
 		fprintf(stderr, "Sequence len(seq1) %ld != recomputed sequence length n1 %d\n", strlen(A->seq1), n1), exit(1);
 	if (A->seq2 && strlen(A->seq2) != n2)
 		fprintf(stderr, "Sequence len(seq2) %ld != recomputed sequence length n2 %d\n", strlen(A->seq2), n2), exit(1);
-	A->start1 = o1;
-	A->start2 = o2;
 	A->len1 = n1;
 	A->len2 = n2;
 
