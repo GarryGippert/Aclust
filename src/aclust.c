@@ -3035,6 +3035,7 @@ int pparse(int argc, char *argv[])
 	fprintf(stderr, " -p %s	prefix for output files\n", oprefix);
 	fprintf(stderr, " -jaln		flag write json alignments (%d)\n", p_jaln);
 	fprintf(stderr, " -taln		flag write text alignments (%d)\n", p_taln);
+	fprintf(stderr, " -wdmx		flag write distance matrix (%d)\n", p_wdmx);
 	fprintf(stderr, " -metadata %d	tree metadata distance/pctid [0-2]\n", p_metadata);
 	fprintf(stderr, " -v		verbose stdout and/or stderr (%d)\n", p_v);
 	fprintf(stderr, " -h		show help and quit (%d)\n", p_h);
