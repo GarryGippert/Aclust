@@ -216,11 +216,10 @@ char p_e = 'D';			/* 'D' = distance tree, 'S' = (plus) single embed tree, 'F' = 
 int p_dave = 0;			/* distance averaging flag 0=branch distances, 1=leaf distances */
 
 /* Binning */
-int p_binmin = 4; 		/* Bins with no fewer than this */
-int p_binmed = 10;		/* Loose bins with no fewer than this */
-double p_bindis = 50.0;		/* Threshold for loose bins */
+int p_bmin = 4; 		/* Ignore branches with N < bmin */
+int p_bmed = 10;		/* Centroid of branches with N <= bmed */
+double p_bdis = 50.0;		/* Threshold for loose bins */
 
-FILE *binfp = NULL;
 
 char *f_scorematrixfile = NULL;
 char *f_distancefile = NULL;
@@ -229,6 +228,7 @@ char *oprefix = NULL;
 
 FILE *jsnfp = NULL;		/* file pointer for writing alignment JSON line-by-line */
 FILE *alnfp = NULL;		/* file pointer for writing alignment free text */
+FILE *binfp = NULL;		/* file pointer for writing selected (binned) labels */
 
 void j_opn(FILE * fp)
 {
@@ -2850,10 +2850,10 @@ void bnode_bin_tree(BNODE * B)
 
 	/* when to print and when to recurs */
 	/* print zero if branch too small */
-	if (n < p_binmin)
-		bin_print(index, n, -1, 0);	/* 0 = not binned */
-	else if (n < p_binmed || ave < p_bindis)
-		bin_print(index, n, c, 1);	/* 1 = binned */
+	if (n < p_bmin)
+		bin_print(index, n, -1, 0);	/* 0 = ignored indices */
+	else if (n < p_bmed || ave < p_bdis)
+		bin_print(index, n, c, 1);	/* 1 = binned indices, c = centroid */
 	else if (B->left != NULL && B->right != NULL) {
 		bnode_bin_tree(B->left);
 		bnode_bin_tree(B->right);
@@ -3037,6 +3037,33 @@ int pparse(int argc, char *argv[])
 				fprintf(stderr, "Could not parse metadata level argv[%d] '%s'\n", c, argv[c]), exit(1);
 			c++;
 		}
+		else if (strncmp(argv[c], "-bmin", 5) == 0) {
+			if (++c == argc)
+				parameter_value_missing(c, argc, argv);
+			if (sscanf(argv[c], "%d", &p_bmin) == 1)
+				fprintf(stderr, "Bin min %d\n", p_bmin);
+			else
+				fprintf(stderr, "Could not parse bmin argv[%d] '%s'\n", c, argv[c]), exit(1);
+			c++;
+		}
+		else if (strncmp(argv[c], "-bmed", 5) == 0) {
+			if (++c == argc)
+				parameter_value_missing(c, argc, argv);
+			if (sscanf(argv[c], "%d", &p_bmed) == 1)
+				fprintf(stderr, "Bin med %d\n", p_bmed);
+			else
+				fprintf(stderr, "Could not parse bmed argv[%d] '%s'\n", c, argv[c]), exit(1);
+			c++;
+		}
+		else if (strncmp(argv[c], "-bdis", 5) == 0) {
+			if (++c == argc)
+				parameter_value_missing(c, argc, argv);
+			if (sscanf(argv[c], "%lf", &p_bdis) == 1)
+				fprintf(stderr, "Bin dis %g\n", p_bdis);
+			else
+				fprintf(stderr, "Could not parse bdis argv[%d] '%s'\n", c, argv[c]), exit(1);
+			c++;
+		}
 		/* switch ON <-> OFF */
 		else if (strncmp(argv[c], "-nonself", 8) == 0) {
 			++c;
@@ -3096,6 +3123,10 @@ int pparse(int argc, char *argv[])
 	fprintf(stderr, " -dave		distance averaging mode (%d)\n", p_dave);
 	fprintf(stderr, " -e %c		D=distance tree, S=also single embed tree, F=also full recursive embed tree\n", p_e);
 	fprintf(stderr, " -edim %-8d	(integer) embed dimension\n", p_edim);
+	fprintf(stderr, "Branch-binning parameters:\n");
+	fprintf(stderr, " -bmin %-8d	(integer) Ignore if branches N < bmin\n", p_bmin);
+	fprintf(stderr, " -bmed %-8d	(integer) Centroid if branch N < bmed\n", p_bmed);
+	fprintf(stderr, " -bdis %-8g	(double) Centroid if branch ave(Dij) < bdis\n", p_bdis);
 	fprintf(stderr, "Output parameters:\n");
 	fprintf(stderr, " -p %s	prefix for output files\n", oprefix);
 	fprintf(stderr, " -jaln		flag write json alignments (%d)\n", p_jaln);
@@ -3296,12 +3327,15 @@ int main(int argc, char *argv[])
 	if (!oprefix)
 		oprefix = string_copy(argv[c]);
 
-	char *binfilename = string_copy("sequencebins.dat");
-	if ((binfp = fopen(binfilename, "w")) == NULL)
-		fprintf(stderr, "Unable to fopen(%s, \"w\")\n", binfilename), exit(1);
-	fprintf(stderr, "Binfilename %s open for writing\n", binfilename);
-
 	fprintf(stderr, "oprefix %s\n", oprefix);
+
+	/* Prepare filename and file pointer for writing sequence binning results */
+	char *binfile = char_vector(strlen(oprefix) + strlen(".dbin.dat") + 1);
+	sprintf(binfile, "%s%s", oprefix, ".dbin.dat");
+	if ((binfp = fopen(binfile, "w")) == NULL)
+		fprintf(stderr, "Unable to fopen(%s, \"w\")\n", binfile), exit(1);
+	fprintf(stderr, "Binfilename %s open for writing\n", binfile);
+
 
 	double **dmx = NULL;
 
