@@ -311,7 +311,7 @@ double *double_vector(int n)
 	if ((v = (double *)malloc(n * sizeof(double))) == NULL)
 		fprintf(stderr, "failed to allocate double * vector\n"), exit(1);
 	for (i = 0; i < n; i++)
-		v[i] = 0;
+		v[i] = 0.0;
 	return (v);
 }
 

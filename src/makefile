@@ -1,8 +1,8 @@
-#BIN = $(HOME)/bin/`arch`
-BIN = /work3/garryg/bioC/bin/`arch`
+BIN = $(HOME)/bin/`arch`
+#BIN = /work3/garryg/bioC/bin/`arch`
 VERSION = `git log -n 1 --pretty="format:%h %ci"`
 LFLAGS = -lm
-EXE = aclust
+EXE = aclust bclust
 
 .SUFFIXES:
 .SUFFIXES: .c .o
@@ -17,7 +17,7 @@ all: $(EXE)
 
 save:
 	echo "#define VERSION \"$(VERSION)\"" > version.txt
-	git commit aclust.c version.txt makefile
+	git commit aclust.c bclust.c version.txt makefile
 	git push
 
 clean:
