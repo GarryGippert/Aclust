@@ -2091,7 +2091,7 @@ void between(double **mx, int n, int *index, int m, int *jndex, double *ave, dou
 }
 
 int centroid(double **mx, int *index, int n)
-/* return index of point with smallest average distance to other points */
+/* return point WITHIN index having smallest average distance to other points */
 {
 	double *vec = double_vector(n), v, m = 99999.9;
 	int i, j, c = -1;
@@ -2104,7 +2104,7 @@ int centroid(double **mx, int *index, int n)
 	for (i = 0; i < n; i++) { 
 		vec[i] /= (double)n;
 		if ( vec[i] < m )
-			c = index[i], m = vec[i];
+			c = i, m = vec[i];
 	}
 	double_vector_free(n, vec);
 	return c;
@@ -2826,11 +2826,12 @@ void write_tree(BNODE * P, char *filename)
 	fclose(fp);
 }
 
-void bin_print(int *index, int n, int center, int value)
+void bin_print(int *index, int n, int center)
+/* print labels assigned to center label or None */
 {
 	int i;
 	for (i = 0; i < n; i++)
-		fprintf(binfp, "%s\t%d\n", flab[index[i]], (index[i] == center ? n : value));
+		fprintf(binfp, "%s\t%s\n", flab[index[i]], (center < 0 ? "None" : flab[index[center]]));
 }
 
 void bnode_bin_tree(BNODE * B)
@@ -2851,9 +2852,9 @@ void bnode_bin_tree(BNODE * B)
 	/* when to print and when to recurs */
 	/* print zero if branch too small */
 	if (n < p_bmin)
-		bin_print(index, n, -1, 0);	/* 0 = ignored indices */
+		bin_print(index, n, -1);	/* no bin */
 	else if (n < p_bmed || ave < p_bdis)
-		bin_print(index, n, c, 1);	/* 1 = binned indices, c = centroid */
+		bin_print(index, n, c);		/* binned on c */
 	else if (B->left != NULL && B->right != NULL) {
 		bnode_bin_tree(B->left);
 		bnode_bin_tree(B->right);
