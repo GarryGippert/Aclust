@@ -2837,7 +2837,7 @@ void bin_print(int *index, int n, int center, int NN, int *np)
 			fprintf(binfp, "%s\t%s\n", flab[index[i]], (center < 0 ? "None" : flab[index[center]]));
 }
 
-void bnode_bin_tree(BNODE * B, int NN, int *NP)
+void bnode_bin_tree(BNODE * B, int bmin, int bmed, double bdis, int NN, int *NP)
 {
 	/* leaf nodes in tree */
 	int n = bnode_count(B);
@@ -2854,13 +2854,13 @@ void bnode_bin_tree(BNODE * B, int NN, int *NP)
 
 	/* when to print and when to recurs */
 	/* print zero if branch too small */
-	if (n < p_bmin)
+	if (n < bmin)
 		bin_print(index, n, -1, NN, &*NP);	/* center None */
-	else if (n < p_bmed || ave < p_bdis)
+	else if (n < bmed || ave < bdis)
 		bin_print(index, n, c, NN, &*NP);	/* center label[index[c]] */
 	else if (B->left != NULL && B->right != NULL) {
-		bnode_bin_tree(B->left, NN, &*NP);
-		bnode_bin_tree(B->right, NN, &*NP);
+		bnode_bin_tree(B->left, bmin, bmed, bdis, NN, &*NP);
+		bnode_bin_tree(B->right, bmin, bmed, bdis, NN, &*NP);
 	}
 	int_vector_free(n, index);
 }
@@ -3325,6 +3325,23 @@ void read_dmx(char *filename)
 	fclose(fp);
 }
 
+void centerbins(BNODE *B, int comma, char *name, int bmin, int bmed, double bdis)
+{
+	int NN = bnode_count(B), np = 0; /* np = how many so far printed in a tree traversal */
+	j_opn(binfp);
+	if (name)
+		j_str(binfp, YES, "name", name, NULL, NULL);
+	j_int(binfp, YES, "bmin", bmin, NULL, NULL);
+	j_int(binfp, YES, "bmed", bmed, NULL, NULL);
+	j_dbl(binfp, YES, "bdis", bdis, NULL, NULL);
+	fprintf(binfp, "\"centers\": {\n");
+	bnode_bin_tree(B, bmin, bmed, bdis, NN, &np);
+	fprintf(binfp, "}");
+	j_cls(binfp);
+	if (comma)
+		fprintf(binfp, ",\n");
+}
+
 int main(int argc, char *argv[])
 {
 	float stime = elapsed(0.0);
@@ -3392,21 +3409,17 @@ int main(int argc, char *argv[])
 		treefile, elapsed(stime), clocktime(ctime));
 
 	/* binning on distance tree */
-	int NN = bnode_count(dree), np = 0; /* np keeps track of how many we've printed in a given tree traversal */
-	fprintf(stderr, "Leaf nodes %d\n", NN);
+#define IMAX 15
 	if (p_jdis) {
-		j_opn(binfp);
-		j_str(binfp, YES, "name", "default", NULL, NULL);
-		j_int(binfp, YES, "bmin", p_bmin, NULL, NULL);
-		j_int(binfp, YES, "bmed", p_bmed, NULL, NULL);
-		fprintf(binfp, "\"centers\": {\n");
-		
-		bnode_bin_tree(dree, NN, &np);
-
-		fprintf(binfp, "}\n");
-		j_cls(binfp);
-	} else
-		bnode_bin_tree(dree, NN, &np);
+		fprintf(binfp, "[");
+		centerbins(dree, YES, "default", p_bmin, p_bmed, p_bdis);
+		int i;
+		for (i = 1; i <= IMAX; i += 1)
+			centerbins(dree, (i < IMAX ? YES : NO), NULL, p_bmin, p_bmed, (double)i * 10.0);
+		fprintf(binfp, "]");
+	}
+	else
+		bnode_bin_tree(dree, p_bmin, p_bmed, p_bdis, 0, NULL);
 
 	if (p_e == 'D')
 		fprintf(stderr, "Halt after distance tree\n"), exit(0);
