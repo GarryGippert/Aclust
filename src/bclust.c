@@ -219,7 +219,7 @@ int p_dave = 0;			/* distance averaging flag 0=branch distances, 1=leaf distance
 int p_bmin = 4; 		/* Ignore branches with N < bmin */
 int p_bmed = 10;		/* Centroid of branches with N <= bmed */
 double p_bdis = 50.0;		/* Threshold for loose bins */
-
+int p_jdis = 0;			/* Json output of distance binning */
 
 char *f_scorematrixfile = NULL;
 char *f_distancefile = NULL;
@@ -2831,7 +2831,10 @@ void bin_print(int *index, int n, int center)
 {
 	int i;
 	for (i = 0; i < n; i++)
-		fprintf(binfp, "%s\t%s\n", flab[index[i]], (center < 0 ? "None" : flab[index[center]]));
+		if (p_jdis)
+			j_str(binfp, YES, flab[index[i]], (center < 0 ? "None" : flab[index[center]]), NULL, NULL);
+		else
+			fprintf(binfp, "%s\t%s\n", flab[index[i]], (center < 0 ? "None" : flab[index[center]]));
 }
 
 void bnode_bin_tree(BNODE * B)
@@ -3066,6 +3069,11 @@ int pparse(int argc, char *argv[])
 			c++;
 		}
 		/* switch ON <-> OFF */
+		else if (strncmp(argv[c], "-jdis", 5) == 0) {
+			++c;
+			p_jdis = (p_jdis + 1) % 2;
+			fprintf(stderr, "jdis flag %d\n", p_jdis);
+		}
 		else if (strncmp(argv[c], "-nonself", 8) == 0) {
 			++c;
 			p_nonself = (p_nonself + 1) % 2;
@@ -3128,6 +3136,7 @@ int pparse(int argc, char *argv[])
 	fprintf(stderr, " -bmin %-8d	(integer) Ignore if branches N < bmin\n", p_bmin);
 	fprintf(stderr, " -bmed %-8d	(integer) Centroid if branch N < bmed\n", p_bmed);
 	fprintf(stderr, " -bdis %-8g	(double) Centroid if branch ave(Dij) < bdis\n", p_bdis);
+	fprintf(stderr, " -jdis 	flag json (default txt) result of distance binning (%d) \n", p_jdis);
 	fprintf(stderr, "Output parameters:\n");
 	fprintf(stderr, " -p %s	prefix for output files\n", oprefix);
 	fprintf(stderr, " -jaln		flag write json alignments (%d)\n", p_jaln);
@@ -3337,7 +3346,6 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Unable to fopen(%s, \"w\")\n", binfile), exit(1);
 	fprintf(stderr, "Binfilename %s open for writing\n", binfile);
 
-
 	double **dmx = NULL;
 
 	if (f_distancefile != NULL) {
@@ -3384,7 +3392,18 @@ int main(int argc, char *argv[])
 		treefile, elapsed(stime), clocktime(ctime));
 
 	/* binning on distance tree */
-	bnode_bin_tree(dree);
+	if (p_jdis) {
+		j_opn(binfp);
+		j_str(binfp, YES, "name", "default", NULL, NULL);
+		j_int(binfp, YES, "bmin", p_bmin, NULL, NULL);
+		j_int(binfp, YES, "bmed", p_bmed, NULL, NULL);
+		fprintf(binfp, "\"centers\": [\n");
+		
+		bnode_bin_tree(dree);
+		fprintf(binfp, "]\n)");
+		j_cls(binfp);
+	} else
+		bnode_bin_tree(dree);
 
 	if (p_e == 'D')
 		fprintf(stderr, "Halt after distance tree\n"), exit(0);
