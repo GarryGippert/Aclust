@@ -2826,18 +2826,18 @@ void write_tree(BNODE * P, char *filename)
 	fclose(fp);
 }
 
-void bin_print(int *index, int n, int center)
+void bin_print(int *index, int n, int center, int NN, int *np)
 /* print labels assigned to center label or None */
 {
 	int i;
 	for (i = 0; i < n; i++)
 		if (p_jdis)
-			j_str(binfp, YES, flab[index[i]], (center < 0 ? "None" : flab[index[center]]), NULL, NULL);
+			j_str(binfp, (++(*np) < NN ? YES : NO), flab[index[i]], (center < 0 ? "None" : flab[index[center]]), NULL, NULL);
 		else
 			fprintf(binfp, "%s\t%s\n", flab[index[i]], (center < 0 ? "None" : flab[index[center]]));
 }
 
-void bnode_bin_tree(BNODE * B)
+void bnode_bin_tree(BNODE * B, int NN, int *NP)
 {
 	/* leaf nodes in tree */
 	int n = bnode_count(B);
@@ -2855,12 +2855,12 @@ void bnode_bin_tree(BNODE * B)
 	/* when to print and when to recurs */
 	/* print zero if branch too small */
 	if (n < p_bmin)
-		bin_print(index, n, -1);	/* no bin */
+		bin_print(index, n, -1, NN, &*NP);	/* center None */
 	else if (n < p_bmed || ave < p_bdis)
-		bin_print(index, n, c);		/* binned on c */
+		bin_print(index, n, c, NN, &*NP);	/* center label[index[c]] */
 	else if (B->left != NULL && B->right != NULL) {
-		bnode_bin_tree(B->left);
-		bnode_bin_tree(B->right);
+		bnode_bin_tree(B->left, NN, &*NP);
+		bnode_bin_tree(B->right, NN, &*NP);
 	}
 	int_vector_free(n, index);
 }
@@ -3392,18 +3392,21 @@ int main(int argc, char *argv[])
 		treefile, elapsed(stime), clocktime(ctime));
 
 	/* binning on distance tree */
+	int NN = bnode_count(dree), np = 0; /* np keeps track of how many we've printed in a given tree traversal */
+	fprintf(stderr, "Leaf nodes %d\n", NN);
 	if (p_jdis) {
 		j_opn(binfp);
 		j_str(binfp, YES, "name", "default", NULL, NULL);
 		j_int(binfp, YES, "bmin", p_bmin, NULL, NULL);
 		j_int(binfp, YES, "bmed", p_bmed, NULL, NULL);
-		fprintf(binfp, "\"centers\": [\n");
+		fprintf(binfp, "\"centers\": {\n");
 		
-		bnode_bin_tree(dree);
-		fprintf(binfp, "]\n)");
+		bnode_bin_tree(dree, NN, &np);
+
+		fprintf(binfp, "}\n");
 		j_cls(binfp);
 	} else
-		bnode_bin_tree(dree);
+		bnode_bin_tree(dree, NN, &np);
 
 	if (p_e == 'D')
 		fprintf(stderr, "Halt after distance tree\n"), exit(0);
