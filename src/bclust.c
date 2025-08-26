@@ -3328,7 +3328,7 @@ void read_dmx(char *filename)
 void centerbins(BNODE *B, int comma, char *name, int bmin, int bmed, double bdis)
 {
 	int NN = bnode_count(B), np = 0; /* np = how many so far printed in a tree traversal */
-	j_opn(binfp);
+	fprintf(binfp, "{");
 	if (name)
 		j_str(binfp, YES, "name", name, NULL, NULL);
 	j_int(binfp, YES, "bmin", bmin, NULL, NULL);
@@ -3336,8 +3336,7 @@ void centerbins(BNODE *B, int comma, char *name, int bmin, int bmed, double bdis
 	j_dbl(binfp, YES, "bdis", bdis, NULL, NULL);
 	fprintf(binfp, "\"centers\": {\n");
 	bnode_bin_tree(B, bmin, bmed, bdis, NN, &np);
-	fprintf(binfp, "}");
-	j_cls(binfp);
+	fprintf(binfp, "}}");
 	if (comma)
 		fprintf(binfp, ",\n");
 }
@@ -3408,14 +3407,14 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "Distance tree written to %s %.3f elapsed CPU seconds, %d clock seconds\n",
 		treefile, elapsed(stime), clocktime(ctime));
 
-	/* binning on distance tree */
+	/* binning on distance tree from 1..IMAX * 10.0 score distance units */
 #define IMAX 15
 	if (p_jdis) {
 		fprintf(binfp, "[");
 		centerbins(dree, YES, "default", p_bmin, p_bmed, p_bdis);
-		int i;
-		for (i = 1; i <= IMAX; i += 1)
-			centerbins(dree, (i < IMAX ? YES : NO), NULL, p_bmin, p_bmed, (double)i * 10.0);
+		int b;
+		for (b = 1; b <= IMAX; b += 1)
+			centerbins(dree, (b < IMAX ? YES : NO), NULL, p_bmin, p_bmed, (double)b * 10.0);
 		fprintf(binfp, "]");
 	}
 	else
