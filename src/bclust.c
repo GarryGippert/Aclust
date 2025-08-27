@@ -3220,6 +3220,11 @@ void read_alf(int argc, char *argv[], int cstart)
 		if ((fp = fopen(argv[c], "r")) == NULL)
 			fprintf(stderr, "Could not open filename %s r mode\n", argv[c]), exit(1);
 		while (fgets(line, sizeof(line), fp) != NULL) {
+			/* ALIGNFASTAS output on the HPC is appended with system-generated job run information */
+			if (strncmp(line, "# Completed", 11) == 0) {
+				fprintf(stderr, "End of Alignfastas input detected >>%s<<\n", line);
+				break;
+			}
 			if (strlen(line) == 0 || line[0] == '#')
 				continue;
 			if (sscanf(line, "%*s %s %*d %s %*d %*d %*d %*d %*d %*d %*d %*d %*d %lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %lf",
