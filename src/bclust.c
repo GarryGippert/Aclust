@@ -218,8 +218,8 @@ int p_dave = 0;			/* distance averaging flag 0=branch distances, 1=leaf distance
 /* Binning */
 int p_bmin = 4; 		/* Ignore branches with N < bmin */
 int p_bmed = 10;		/* Centroid of branches with N <= bmed */
-double p_bdis = 50.0;		/* Threshold for loose bins */
-int p_jdis = 0;			/* Json output of distance binning */
+char p_brng[1024];		/* Threshold for cluster binning */
+int p_jdis = 1;			/* Json output of distance binning */
 
 char *f_scorematrixfile = NULL;
 char *f_distancefile = NULL;
@@ -229,6 +229,9 @@ char *oprefix = NULL;
 FILE *jsnfp = NULL;		/* file pointer for writing alignment JSON line-by-line */
 FILE *alnfp = NULL;		/* file pointer for writing alignment free text */
 FILE *binfp = NULL;		/* file pointer for writing selected (binned) labels */
+
+int nrng = 0;
+double *brng = NULL;
 
 void j_opn(FILE * fp)
 {
@@ -2831,10 +2834,14 @@ void bin_print(int *index, int n, int center, int NN, int *np)
 {
 	int i;
 	for (i = 0; i < n; i++)
+#ifdef OLDSTUFF
 		if (p_jdis)
 			j_str(binfp, (++(*np) < NN ? YES : NO), flab[index[i]], (center < 0 ? "None" : flab[index[center]]), NULL, NULL);
 		else
 			fprintf(binfp, "%s\t%s\n", flab[index[i]], (center < 0 ? "None" : flab[index[center]]));
+#else
+		j_str(binfp, (++(*np) < NN ? YES : NO), flab[index[i]], (center < 0 ? "None" : flab[index[center]]), NULL, NULL);
+#endif
 }
 
 void bnode_bin_tree(BNODE * B, int bmin, int bmed, double bdis, int NN, int *NP)
@@ -3041,6 +3048,15 @@ int pparse(int argc, char *argv[])
 				fprintf(stderr, "Could not parse metadata level argv[%d] '%s'\n", c, argv[c]), exit(1);
 			c++;
 		}
+		else if (strncmp(argv[c], "-brng", 5) == 0) {
+			if (++c == argc)
+				parameter_value_missing(c, argc, argv);
+			if (sscanf(argv[c], "%s", p_brng) == 1)
+				fprintf(stderr, "Bin range %s\n", p_brng);
+			else
+				fprintf(stderr, "Could not parse brng argv[%d] '%s'\n", c, argv[c]), exit(1);
+			c++;
+		}
 		else if (strncmp(argv[c], "-bmin", 5) == 0) {
 			if (++c == argc)
 				parameter_value_missing(c, argc, argv);
@@ -3057,15 +3073,6 @@ int pparse(int argc, char *argv[])
 				fprintf(stderr, "Bin med %d\n", p_bmed);
 			else
 				fprintf(stderr, "Could not parse bmed argv[%d] '%s'\n", c, argv[c]), exit(1);
-			c++;
-		}
-		else if (strncmp(argv[c], "-bdis", 5) == 0) {
-			if (++c == argc)
-				parameter_value_missing(c, argc, argv);
-			if (sscanf(argv[c], "%lf", &p_bdis) == 1)
-				fprintf(stderr, "Bin dis %g\n", p_bdis);
-			else
-				fprintf(stderr, "Could not parse bdis argv[%d] '%s'\n", c, argv[c]), exit(1);
 			c++;
 		}
 		/* switch ON <-> OFF */
@@ -3132,11 +3139,10 @@ int pparse(int argc, char *argv[])
 	fprintf(stderr, " -dave		distance averaging mode (%d)\n", p_dave);
 	fprintf(stderr, " -e %c		D=distance tree, S=also single embed tree, F=also full recursive embed tree\n", p_e);
 	fprintf(stderr, " -edim %-8d	(integer) embed dimension\n", p_edim);
-	fprintf(stderr, "Branch-binning parameters:\n");
-	fprintf(stderr, " -bmin %-8d	(integer) Ignore if branches N < bmin\n", p_bmin);
-	fprintf(stderr, " -bmed %-8d	(integer) Centroid if branch N < bmed\n", p_bmed);
-	fprintf(stderr, " -bdis %-8g	(double) Centroid if branch ave(Dij) < bdis\n", p_bdis);
-	fprintf(stderr, " -jdis 	flag json (default txt) result of distance binning (%d) \n", p_jdis);
+	fprintf(stderr, "Centroid identification parameters:\n");
+	fprintf(stderr, " -brng %s	Comma-separated distance threshold values,ranges\n", p_brng);
+	fprintf(stderr, " -bmin %-8d	Minimum branch size for centroid identification\n", p_bmin);
+	fprintf(stderr, " -bmed %-8d	Identify centroid for branch size even if not below threshold\n", p_bmed);
 	fprintf(stderr, "Output parameters:\n");
 	fprintf(stderr, " -p %s	prefix for output files\n", oprefix);
 	fprintf(stderr, " -jaln		flag write json alignments (%d)\n", p_jaln);
@@ -3346,18 +3352,122 @@ void centerbins(BNODE *B, int comma, char *name, int bmin, int bmed, double bdis
 		fprintf(binfp, ",\n");
 }
 
+
+void dcnt(char *wrd, int *n) {
+	double start, end, inc, v;
+	if (sscanf(wrd, "%lg-%lg/%lg", &start, &end, &inc) == 3) { }
+	else if (sscanf(wrd, "%lg-%lg", &start, &end) == 2) { inc = 1.0; }
+	else if (sscanf(wrd, "%lg", &start) == 1) { end = start, inc = 1.0; }
+	else
+		fprintf(stderr, "dcnt: Could not sscanf '%s' to a range or value\n", wrd), exit(1);
+	if (p_v)
+		fprintf(stderr, "dparse start %lg end %lg inc %lg\n", start, end, inc);
+	if (end < start || inc < 0.0)
+		fprintf(stderr, "dparse error start %lg end %lg inc %lg\n", start, end, inc), exit(0);
+	for (v = start; v <= end; v += inc) {
+		if (p_v)
+			fprintf(stderr, "dcnt n %d v %lg\n", *n, v);
+		*n += 1;
+	}
+}
+
+void dset(char *wrd, int *n, double *vec) {
+	double start, end, inc, v;
+	if (sscanf(wrd, "%lg-%lg/%lg", &start, &end, &inc) == 3) { }
+	else if (sscanf(wrd, "%lg-%lg", &start, &end) == 2) { inc = 1.0; }
+	else if (sscanf(wrd, "%lg", &start) == 1) { end = start, inc = 1.0; }
+	else
+		fprintf(stderr, "dset: Could not sscanf '%s' to a range or value\n", wrd), exit(1);
+	if (p_v)
+		fprintf(stderr, "dparse start %lg end %lg inc %lg\n", start, end, inc);
+	if (end < start || inc < 0.0)
+		fprintf(stderr, "dparse error start %lg end %lg inc %lg\n", start, end, inc), exit(0);
+	for (v = start; v <= end; v += inc) {
+		if (p_v)
+			fprintf(stderr, "dset n %d v %lg\n", *n, v);
+		vec[*n] = v;
+		*n += 1;
+	}
+}
+
+double *drange(char *str, int *n)
+{
+	/* return a double vector of values represented by a comma-separated list, and indirectly length of vector.
+	   Comma-separated words may be single number or a range. Currently only positive ranges are supported.
+	   Ranges are specified by "start-end/increment" or "start-end" with implied increment 1.0.
+		Usage:
+			int n = 0; double *vec = drange("1,2,4,10,30-50/5,66-70", &n);
+		Returns:
+			n = 14; and
+			vec = [1.0, 2.0, 4.0, 10.0, 30.0, 35.0, 40.0, 45.0, 50.0, 66.0, 67.0, 68.0, 69.0, 70.0];
+	*/
+	*n = 0;
+        double *vec = NULL;
+#define STRLEN 1000
+#define WRDLEN 100
+        char *tmp, *wrd, *rst;
+        if ((tmp = (char *)malloc(STRLEN * sizeof(char))) == NULL)
+                fprintf(stderr, "drange, could not allocate tmp %d\n", STRLEN), exit(1);
+        strcpy(tmp, str);
+        if (strlen(tmp) >= STRLEN)
+                fprintf(stderr, "drange, must increase STRLEN from %d to at least %ld\n", STRLEN, strlen(tmp)), exit(1);
+        if ((wrd = (char *)malloc(WRDLEN * sizeof(char))) == NULL)
+                fprintf(stderr, "drange, could not allocate wrd %d\n", WRDLEN), exit(1);
+        if ((rst = (char *)malloc(STRLEN * sizeof(char))) == NULL)
+                fprintf(stderr, "drange, could not allocate rst %d\n", STRLEN), exit(1);
+
+	/* Count elements implied by parsed drange string */
+        while ( strlen(tmp) ) {
+                strcpy(rst, "");
+		if (sscanf(tmp, "%[^,],%s", wrd, rst) == 2) {
+			dcnt(wrd, &(*n));
+			strcpy(tmp, rst);
+		}
+		else if (sscanf(tmp, "%s", wrd) == 1) {
+			dcnt(wrd, &(*n));
+			strcpy(tmp, "");
+		}
+        }
+	fprintf(stderr, "drange *n %d\n", *n);
+
+	/* Allocate and fill elements implied by parsed drange string */
+	if ((vec = (double *)malloc(*n * sizeof(double))) == NULL)
+		fprintf(stderr, "Unable to allocate %d x sizeof(double)\n", *n), exit(1);
+        strcpy(tmp, str);
+        *n = 0;
+        while ( strlen(tmp) ) {
+                strcpy(rst, "");
+		if (sscanf(tmp, "%[^,],%s", wrd, rst) == 2) {
+			dset(wrd, &(*n), vec);
+			strcpy(tmp, rst);
+		}
+		else if (sscanf(tmp, "%s", wrd) == 1) {
+			dset(wrd, &(*n), vec);
+			strcpy(tmp, "");
+		}
+        }
+        free(tmp), free(wrd), free(rst);
+	int i;
+	for (i = 0; i < *n; i++)
+		fprintf(stderr, "brng %d %lg\n", i, vec[i]);
+        return vec;
+}
+
 int main(int argc, char *argv[])
 {
 	float stime = elapsed(0.0);
 	int ctime = clocktime(0);
+
+	strcpy(p_brng, "50.0");
+
 	int c = pparse(argc, argv);
+	
 	if (!oprefix)
 		oprefix = string_copy("this");
 	if (c == 1)
 		explain_input_better(argc, argv, c);
 	if (!oprefix)
 		oprefix = string_copy(argv[c]);
-
 	fprintf(stderr, "oprefix %s\n", oprefix);
 
 	/* Prepare filename and file pointer for writing sequence binning results */
@@ -3366,6 +3476,8 @@ int main(int argc, char *argv[])
 	if ((binfp = fopen(binfile, "w")) == NULL)
 		fprintf(stderr, "Unable to fopen(%s, \"w\")\n", binfile), exit(1);
 	fprintf(stderr, "Binfilename %s open for writing\n", binfile);
+
+	brng = drange(p_brng, &nrng);
 
 	double **dmx = NULL;
 
@@ -3412,18 +3524,12 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "Distance tree written to %s %.3f elapsed CPU seconds, %d clock seconds\n",
 		treefile, elapsed(stime), clocktime(ctime));
 
-	/* binning on distance tree from 1..IMAX * 10.0 score distance units */
-#define IMAX 15
-	if (p_jdis) {
-		fprintf(binfp, "[");
-		centerbins(dree, YES, "default", p_bmin, p_bmed, p_bdis);
-		int b;
-		for (b = 1; b <= IMAX; b += 1)
-			centerbins(dree, (b < IMAX ? YES : NO), NULL, p_bmin, p_bmed, (double)b * 10.0);
-		fprintf(binfp, "]");
-	}
-	else
-		bnode_bin_tree(dree, p_bmin, p_bmed, p_bdis, 0, NULL);
+	/* binning to find centroids at different distance scales */
+	fprintf(binfp, "[");
+	int b;
+	for (b = 0; b < nrng; b++)
+		centerbins(dree, (b+1 < nrng ? YES : NO), NULL, p_bmin, p_bmed, brng[b]);
+	fprintf(binfp, "]");
 
 	if (p_e == 'D')
 		fprintf(stderr, "Halt after distance tree\n"), exit(0);
