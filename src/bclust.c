@@ -1,10 +1,22 @@
-/* ACLUST
+/* ACLUST package of software written by G.P.Gippert.
 
-BCLUST attempts binning of sequence space
+** ACLUST generates a NNJ binary tree from a distance matrix provided, OR computed from
+pairwise alignments, OR computed from a provided multiple alignment. An embedded
+distance matrix tree can also be generated. The embedding process is attractive in
+that it 'averages out' inaccuracies in distances, but is computationally expensive, so
+is deactivated by default.
 
-Aclust reads one or more Fasta files, computes or interpolates sequence pairwise alignments, and
-builds a nearest-neighbor joining (NNJ) tree from the matrix of pairwise distances.
+** BCLUST is identical to ACLUST, but additionally identifies 'representative' leaf nodes
+at several different distance threholds.
 
+Centroids are identified using a simple algorithm and three input parameters, bmin, bmed
+and brng. Brng may be a single floating point number, or a set of comma-separated numbers
+and ranges, in which case several sets of centroids are produced. The tree is traversed
+from the root (interior) node aka branch. (1) If the number of leaf nodes below a node
+falls is less than bmin, that branch has no centroid. (2) If the average pairwise distance
+between all leaf nodes in the branch is <= (below or equal to) brng, OR the branch has at
+least bmed leaf nodes, the leaf node closest to the geometric center of leaf nodes within
+the branch is chosen.  (3) Otherwise recursively examine left and right sub-branches.
 
 Sequence alignments:
 
