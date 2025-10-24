@@ -956,6 +956,23 @@ char line[MAXLINELEN], text[MAXLINELEN], acc[MAXLINELEN], seq[MAXSEQUENCELEN];
 00x00 cazy104635-Meloidogyne_incognita-GT66    759 cazy104635-Meloidogyne_incognita-GT66    759    759    759    759    759 0      0    759    759 1        3979   3979 1065.59 1065.59 1537.32 1537.32 85.9893     15   3979   3979   -759     -0 -0     -0     -0
 */
 
+void check_fasta() {
+	int g;
+	char *c;
+	for (g = 0; g < g_index; g++)
+		fprintf(stderr, "index %d label %s\n", g, flab[g]);
+	int e = 0;
+	for (g = 0; g < g_index; g++)
+		if ((c = strchr(flab[g], ':')) != NULL) {
+			fprintf(stderr, "index %d label %s char '%c', strchr '%s'\n", g, flab[g], ':', c);
+			e += 1;
+		}
+	if (e>0)
+		exit(1);
+	fprintf(stderr, "check_fasta() complete %d labels\n", g_index);
+}
+
+ 
 void read_fasta(char *filename)
 {
 	/* read sequence fasta file */
@@ -1000,6 +1017,9 @@ void read_fasta(char *filename)
 	fclose(fp);
 	if (p_v)
 		print_fasta();
+	int p_c = 1;
+	if (p_c)
+		check_fasta();
 }
 
 /* ALIGNMENT */
