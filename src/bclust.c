@@ -236,11 +236,13 @@ int p_jdis = 1;			/* Json output of distance binning */
 char *f_scorematrixfile = NULL;
 char *f_distancefile = NULL;
 char *f_accessionsfile = NULL;
+char *f_balnfile = NULL;
 char *oprefix = NULL;
 
 FILE *jsnfp = NULL;		/* file pointer for writing alignment JSON line-by-line */
 FILE *alnfp = NULL;		/* file pointer for writing alignment free text */
 FILE *binfp = NULL;		/* file pointer for writing selected (binned) labels */
+FILE *balfp = NULL;		/* file pointer for reading binary alignments */
 
 int nrng = 0;
 double *brng = NULL;
