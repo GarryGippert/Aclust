@@ -847,7 +847,7 @@ DNODE *dnode_locate(char *label)
 	return dnode_srch(droot, label, strlen(label), 0);
 }
 
-#define MAXENTRIES 10000
+#define MAXENTRIES 30000
 int g_index = 0;		/* global count of sequence labels must not exceed MAXENTRIES */
 char *flab[MAXENTRIES];
 char *fseq[MAXENTRIES];
