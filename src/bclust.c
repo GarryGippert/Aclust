@@ -223,9 +223,8 @@ int p_nonself = 0;		/* do not align with self (show only off-diagonal elements *
 int p_metadata = 1;		/* print tree node metadata */
 
 /* Treebuilding */
-char p_e = 'D';			/* 'D' = distance tree, 'S' = (plus) single embed tree, 'F' = (plus) full recursive
-				embed tree */
-int p_dave = 0;			/* distance averaging flag 0=branch distances, 1=leaf distances */
+int p_dave = 0;			/* Distance averaging parameter 0=branch, 1=leaf, 2=NJ */
+char p_e = 'D';			/* 'D' = dree, 'S' = single embed tree, 'F' = full recursive embed tree */
 
 /* Binning */
 int p_bmin = 4; 		/* Ignore branches with N < bmin */
@@ -2297,6 +2296,131 @@ void bnode_bnodei(BNODE * B, BNODE * *bnode, int *i)
 #define DMX_SIX		0x00000020	/* == 32 */
 #define DMX_SEVEN	0x00000040	/* == 64 */
 
+double next_emx(int e, double **emx, int *evail, int *mini, int *minj)
+{
+	*mini = *minj = e;
+	double minq = 1e36;
+	/* compute number of available nodes */
+	int n = 0, i;
+	for (i = 0; i < e; i++)
+		if (evail[i])
+			n += 1;
+	if (n < 2)
+		fprintf(stderr, "Fewer than 2 nodes left to join!?\n"), exit(1);
+	/* find i, j pair with lowest Qij value (see also wiki/Neighbor_joining) */
+	int j, k;
+	double sum;
+	for (i = 0; i < e; i++) if (evail[i]) for (j = i+1; j < e; j++) if (evail[j]) {
+		sum = ((float)(n - 2)) * emx[i][j];
+		for (k = 0; k < e; k++)
+			if (evail[k])
+				sum -= (emx[i][k] + emx[j][k]);
+		if (sum < minq) {
+			*mini = i;
+			*minj = j;
+			 minq = sum;
+		}
+	}
+	return( minq );
+}
+
+BNODE *bnode_tree_dmx_nj(int n, int *index, double **dmx, int dmx_flag)
+{
+/* Compute binary tree from DMX using unweighted NJ algorithm inspired by https://en.wikipedia.org/wiki/Neighbor_joining. */
+
+	int e = 2 * n - 1;
+	if (e >= MAXNODES)
+		fprintf(stderr, "Too many nodes %d >= allowed MAXNODES %d\n", e, MAXNODES), exit(1);
+
+	/* e x e (extended) distance matrix initialized with n x n original distance matrix */
+	double **emx = double_matrix(e, e);
+	int i, j;
+	for (i = 0; i < n; i++)
+		for (j = i + 1; j < n; j++)
+			emx[i][j] = emx[j][i] = dmx[i][j];
+
+	/* e x node availability vector, initialized by first n leaf nodes */
+	int *evail = int_vector(e);
+	for (i = 0; i < n; i++)
+		evail[i] = 1;
+
+	/* e x BNODE vector, initialized by first n leaf nodes */
+	BNODE **bvec = bnode_vec(e, 1);
+	for (i = 0; i < n; i++)
+		bvec[i]->index = (index ? index[i] : i);
+
+	/* Tree root eventually assigned to one of the allocated nodes */
+	BNODE *P = NULL;
+
+	/* M is the next available index after N leaf nodes */
+	int m = n, f, g;
+	double minq;
+	while (m < e) {
+		/* find next pair of nodes to join */
+		minq = next_emx(e, emx, evail, &f, &g);
+		if (f >= e) {
+			fprintf(stderr, "No more joinable nodes\n");
+			break;
+		}
+		/* compute distances from joined nodes to new node */
+		double duf = emx[f][g]/2.0;
+
+
+		/* joined nodes no longer available */
+		evail[f] = evail[g] = 0;
+		int k;
+		for(k = 0; k < e; k++)
+			if (evail[k])
+				duf += (emx[f][k] - emx[g][k])/(2.0*(float)(e-m-1));
+		
+		if (1 || p_v > 1)
+			fprintf(stderr, "NJ: Node %d join pair %d %d %f, duf %f dug %g\n",
+				m, f, g, minq, duf, emx[f][g] - duf );
+
+		/* Assign nodes */
+		P = bvec[m];
+		BNODE *A = bvec[f];
+		BNODE *B = bvec[g];
+		A->parent = P;
+		B->parent = P;
+
+		/* Assign distances to parent */
+		A->parent_distance = emx[f][m] = emx[m][f] = duf;
+		B->parent_distance = emx[g][m] = emx[m][g] = emx[f][g] - duf;
+
+		/* Choose left/right A/B linkage */
+		if (p_r == 'N') {
+			P->left = A;
+			P->right = B;
+		}
+		else {
+			int ac = bnode_count(A);
+			int bc = bnode_count(B);
+			if (p_r == 'L') {	/* largest subtree to left */
+				P->left = (ac >= bc ? A : B);
+				P->right = (ac >= bc ? B : A);
+			}
+			else if (p_r == 'R') {	/* largest subtree to right */
+				P->left = (ac >= bc ? B : A);
+				P->right = (ac >= bc ? A : B);
+			}
+		}
+
+		/* Assign distance from parent to each child */
+                P->left_distance = P->left->parent_distance;
+                P->right_distance = P->right->parent_distance;
+
+		/* compute distances from new node to available nodes */
+		for(k = 0; k < e; k++)
+			if (evail[k])
+	                        emx[k][m] = emx[m][k] = (emx[f][k] + emx[g][k] - emx[f][g])/2.0;
+
+		/* and make the new node available */
+		evail[m] = 1;
+		m++;
+	}
+	return(P);
+}
 
 /* provide a binary tree from a DISTANCE matrix using nearest-neighbor joining algorithm and DISTANCE averaging (yuck) */
 /* dmx_flag should control distance calculation at nnj/node creation */
@@ -2926,11 +3050,21 @@ void write_dmx(char *oprefix)
 
 BNODE *bnode_distance_tree(int n, double **dmx)
 {
+	BNODE *P = NULL;
 	int *index = int_vector_ramp(n);
-	int dmx_flag = DMX_ONE;
-	if (p_dave)
-		dmx_flag = DMX_TWO;
-	BNODE *P = bnode_tree_dmx(n, index, dmx, dmx_flag);
+	switch (p_dave) {
+	case 0: fprintf(stderr, "NNJ Distance average branch\n");
+		P = bnode_tree_dmx(n, index, dmx, DMX_ONE);
+		break;
+	case 1: fprintf(stderr, "NNJ Distance average leaves\n");
+		P = bnode_tree_dmx(n, index, dmx, DMX_TWO);
+		break;
+	case 2: fprintf(stderr, "NJ unweighted\n");
+		P = bnode_tree_dmx_nj(n, index, dmx, 0);
+		break;
+	default: fprintf(stderr, "Undefined tree-building algorithm\n");
+		exit(1);
+	}
 	return (P);
 }
 
@@ -2983,11 +3117,12 @@ int pparse(int argc, char *argv[])
 /* parse command line and set some input and output filename defaults */
 	int c = 1;
 	while (c < argc) {
+
 		/* flag to read multiple sequence alignment input */
 		if (strncmp(argv[c], "-msa", 4) == 0) {
 			++c;
 			p_msa = (p_msa + 1) % 2;
-			fprintf(stderr, "Multipl Sequence Alignment input %d\n", p_msa);
+			fprintf(stderr, "Multiple Sequence Alignment input %d\n", p_msa);
 		}
 
 		/* flag to read alignfastas input */
@@ -3024,9 +3159,13 @@ int pparse(int argc, char *argv[])
 			fprintf(stderr, "output prefix '%s'\n", oprefix);
 		}
 		else if (strncmp(argv[c], "-dave", 5) == 0) {
-			++c;
-			p_dave = (p_dave + 1) % 2;
-			fprintf(stderr, "distance averaging flag %d\n", p_dave);
+			if (++c == argc)
+				parameter_value_missing(c, argc, argv);
+			if (sscanf(argv[c], "%d", &p_dave) == 1)
+				fprintf(stderr, "Distance averaging %d\n", p_dave);
+			else
+				fprintf(stderr, "Could not parse argv[%d] '%s'\n", c, argv[c]), exit(1);
+			c++;
 		}
 		else if (strncmp(argv[c], "-edim", 5) == 0) {
 			if (++c == argc)
@@ -3170,7 +3309,7 @@ int pparse(int argc, char *argv[])
 	fprintf(stderr, " -ge %-8g	(double) value of affine gap extension penalty\n", p_ge);
 	fprintf(stderr, " -gx %-8d	(integer) value affine gap crossover maxlength (0 to deactivate)\n", p_gx);
 	fprintf(stderr, "Tree-building parameters:\n");
-	fprintf(stderr, " -dave		distance averaging mode (%d)\n", p_dave);
+	fprintf(stderr, " -dave		Distance averaging (%d) (0=branch, 1=leaf, 2=NJ)\n", p_dave);
 	fprintf(stderr, " -e %c		D=distance tree, S=also single embed tree, F=also full recursive embed tree\n", p_e);
 	fprintf(stderr, " -edim %-8d	(integer) embed dimension\n", p_edim);
 	fprintf(stderr, "Centroid identification parameters:\n");
