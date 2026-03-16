@@ -930,9 +930,30 @@ char line[MAXLINELEN], text[MAXLINELEN], acc[MAXLINELEN], seq[MAXSEQUENCELEN];
 00x00 cazy104635-Meloidogyne_incognita-GT66    759 cazy104635-Meloidogyne_incognita-GT66    759    759    759    759    759 0      0    759    759 1        3979   3979 1065.59 1065.59 1537.32 1537.32 85.9893     15   3979   3979   -759     -0 -0     -0     -0
 */
 
+void check_fasta() {
+	int g;
+	char *c;
+	for (g = 0; g < g_index; g++)
+		fprintf(stderr, "index %d label %s\n", g, flab[g]);
+	int e = 0;
+	for (g = 0; g < g_index; g++)
+		if ((c = strchr(flab[g], ':')) != NULL) {
+			fprintf(stderr, "index %d label %s char '%c', strchr '%s'\n", g, flab[g], ':', c);
+			e += 1;
+		}
+	if (e>0)
+		exit(1);
+	fprintf(stderr, "check_fasta() complete %d labels\n", g_index);
+}
+
+char *f_fastafilename = NULL;
 void read_fasta(char *filename)
 {
 	/* read sequence fasta file */
+	if (f_fastafilename == NULL) {
+		f_fastafilename = string_copy(filename);
+		fprintf(stderr, "First fasta filename '%s'\n", f_fastafilename);
+	}
 	DNODE *d;
 	FILE *fp;
 	if ((fp = fopen(filename, "r")) == NULL)
@@ -974,6 +995,9 @@ void read_fasta(char *filename)
 	fclose(fp);
 	if (p_v)
 		print_fasta();
+	int p_c = 1;
+	if (p_c)
+		check_fasta();
 }
 
 /* ALIGNMENT */
@@ -1179,6 +1203,15 @@ void aln_write_json(ALN * A)
 {
 /* Write simple JSON, note, sets global variable jsnfp, which must be pre-initialized to NULL */
 	if (!jsnfp) {
+		if (oprefix == NULL) {
+			if (f_fastafilename != NULL)
+				oprefix = string_copy(f_fastafilename);
+			else {
+				fprintf(stderr, "Unable to define oprefix\n");
+				exit(1);
+				oprefix = string_copy("this");
+			}
+		}
 		char *filename = char_vector(strlen(oprefix) + strlen(".aln.js") + 1);
 		sprintf(filename, "%s%s", oprefix, ".aln.js");
 		fprintf(stderr, "jsnfile %s\n", filename);
@@ -1244,6 +1277,15 @@ void aln_write_text(ALN * A)
 /* write plain structured text for alignment, requires that alnfp is initially NULL */
 /* special case of supplied fp causes a write and exit */
 	if (!alnfp) {
+		if (oprefix == NULL) {
+			if (f_fastafilename != NULL)
+				oprefix = string_copy(f_fastafilename);
+			else {
+				fprintf(stderr, "Unable to define oprefix\n");
+				exit(1);
+				oprefix = string_copy("this");
+			}
+		}
 		char *filename = char_vector(strlen(oprefix) + strlen(".aln.txt") + 1);
 		sprintf(filename, "%s%s", oprefix, ".aln.txt");
 		if ((alnfp = fopen(filename, "w")) == NULL)
@@ -2798,8 +2840,14 @@ void write_tree(BNODE * P, char *filename)
 	fclose(fp);
 }
 
-void write_dmx(char *oprefix)
+void write_dmx()
 {
+	if (oprefix == NULL) {
+		if (f_fastafilename != NULL)
+			oprefix = string_copy(f_fastafilename);
+		else
+			oprefix = string_copy("this");
+	}
 /* print distance upper half matrix plus diagonal */
 	char *filename = char_vector(strlen(oprefix) + strlen(".dmx.txt") + 1);
 	sprintf(filename, "%s%s", oprefix, ".dmx.txt");
@@ -3066,11 +3114,11 @@ void read_fasta_files(int argc, char *argv[], int cstart)
 	}
 }
 
-void explain_input_better(int argc, char *argv[], int cstart)
+void explain_better(int argc, char *argv[], int cstart)
 {
 	fprintf(stderr, "argc %d cstart %d\n", argc, cstart);
 	if (cstart == argc)
-		fprintf(stderr, "Input file(s) needed, expecting Fasta filenames\n"), exit(1);
+		fprintf(stderr, "my.fasta [my2.fasta ...]\n"), exit(1);
 }
 
 void read_alf(int argc, char *argv[], int cstart)
@@ -3230,15 +3278,9 @@ int main(int argc, char *argv[])
 {
 	float stime = elapsed(0.0);
 	int ctime = clocktime(0);
-	int c = pparse(argc, argv);
-	if (!oprefix)
-		oprefix = string_copy("this");
-	if (c == 1)
-		explain_input_better(argc, argv, c);
-	if (!oprefix)
-		oprefix = string_copy(argv[c]);
-
-	fprintf(stderr, "oprefix %s\n", oprefix);
+	int c;
+	if ((c = pparse(argc, argv)) == 1)
+		explain_better(argc, argv, c);
 
 	double **dmx = NULL;
 
@@ -3250,7 +3292,7 @@ int main(int argc, char *argv[])
 		/* read dmx from alignfasta file(s) */
 		read_alf(argc, argv, c);
 		if (p_wdmx)
-			write_dmx(oprefix);
+			write_dmx();
 	}
 	else {
 		/* compute dmx from computed or interpolated pairwise alignments */
@@ -3260,7 +3302,7 @@ int main(int argc, char *argv[])
 		read_fasta_files(argc, argv, c);
 		align_fasta();
 		if (p_wdmx)
-			write_dmx(oprefix);
+			write_dmx();
 	}
 	/* test the distance matrix for 'holes' */
 	fprintf(stderr, "Got DMX with %d entries, scanning for possible holes...\n", g_index);
@@ -3279,8 +3321,18 @@ int main(int argc, char *argv[])
 
 	/* Construct tree based on distance matrix alone. */
 	BNODE *dree = bnode_distance_tree(g_index, global_dmx);
+	if (oprefix == NULL) {
+		if (f_fastafilename != NULL)
+			oprefix = string_copy(f_fastafilename);
+		else {
+			fprintf(stderr, "Unable to define oprefix\n");
+			oprefix = string_copy("this");
+		}
+		fprintf(stderr, "define oprefix '%s'\n", oprefix);
+	}
 	char *treefile = char_vector(strlen(oprefix) + strlen(".dree.txt") + 1);
 	sprintf(treefile, "%s%s", oprefix, ".dree.txt");
+	printf("TREEFILE '%s'\n", treefile);
 	write_tree(dree, treefile);
 	fprintf(stderr, "Distance tree written to %s %.3f elapsed CPU seconds, %d clock seconds\n",
 		treefile, elapsed(stime), clocktime(ctime));
