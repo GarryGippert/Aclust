@@ -3406,7 +3406,8 @@ void read_alf(int argc, char *argv[], int cstart)
 			}
 			if (strlen(line) == 0 || line[0] == '#')
 				continue;
-			if (sscanf(line, "%*s %s %*d %s %*d %*d %*d %*d %*d %*d %*d %*d %*d %lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %lf",
+			/* if (sscanf(line, "%*s %s %*d %s %*d %*d %*d %*d %*d %*d %*d %*d %*d %lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %lf", */
+			if (sscanf(line, "%*s %s %*d %s %*d %*d %*d %*d %*d %*d %*d %*d %*d %lf %*f %*f %*f %*f %*f %*f %*f %*f %*f %*f %*f %*f %*f %*f %lf",
 				   label1, label2, &pctid, &sdist) != 4)
 				fprintf(stderr, "Could not sscanf label1, label2, pctid, sdist from line >>%s<<\n", line), exit(1);
 			parsed++;
