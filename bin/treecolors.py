@@ -51,7 +51,7 @@ def branch_centroids(dat, dataset_label='Bclust centers'):
 	out.append( "SEPARATOR COMMA")
 	out.append(f"DATASET_LABEL,{dataset_label}")
 	out.append( "COLOR,#ff0000")
-	out.append( "LEGEND_TITLE,Centers")
+	out.append(f"LEGEND_TITLE,{dataset_label}")
 	out.append(f"LEGEND_SHAPES,{','.join(shapes)}")
 	out.append(f"LEGEND_COLORS,{','.join(colors)}")
 	out.append(f"LEGEND_LABELS,{','.join(labels)}")
@@ -73,7 +73,9 @@ fp.close()
 sys.stderr.write(f"Read {len(dbin)} binning conditions from {args.dbindat}\n")
 
 # Create one pair of files (clusters and centers) for each set of binning conditions
-for con in dbin:
+# In reverse bdis order we capture the largest clades at a given binning resolution
+prev_centers = []
+for con in sorted(dbin, key = lambda x: -x['bdis']):
 	bmin, bmed, bdis, centers = con['bmin'], con['bmed'], con['bdis'], con['centers']
 	dat = {}
 	for label, centroid in centers.items():
@@ -82,8 +84,16 @@ for con in dbin:
 		dat[centroid].append(label)
 	if 'None' in dat:
 		del(dat['None'])
-	prefix = args.prefix if args.prefix is not None else args.dbindat.replace('.dat', '')
 
+	# Did we already see this identical set of centers, then skip
+	curr_centers = sorted(list(dat.keys()), key = lambda x : zeropad(x))
+	if curr_centers == prev_centers:
+		sys.stderr.write(f"Bdis {bdis} skipped, current centers identical to previous: {curr_centers}\n")
+		continue
+	prev_centers = [c for c in curr_centers]
+
+	# Go ahead and generate itol dataset 'txt' files
+	prefix = args.prefix if args.prefix is not None else args.dbindat.replace('.dat', '')
 	filename = f"{prefix}_{bmin}_{bmed}_{bdis}.tree_colors.txt"
 	n = None
 	with open(filename, 'w') as fp:
