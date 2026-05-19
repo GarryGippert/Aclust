@@ -3390,47 +3390,60 @@ void read_alf(int argc, char *argv[], int cstart)
 		fprintf(stderr, "could not allocate tmp_dmx double_matrix %d x %d\n", MAXENTRIES, MAXENTRIES), exit(1);
 	if ((tmp_imx = double_matrix(MAXENTRIES, MAXENTRIES)) == NULL)
 		fprintf(stderr, "could not allocate tmp_imx double_matrix %d x %d\n", MAXENTRIES, MAXENTRIES), exit(1);
-	for (i = 0; i < g_index; i++)
-		for (j = 0; j < g_index; j++)
-			tmp_dmx[i][j] = tmp_imx[i][j] = -99.0;
-	int parsed = 0, skipped = 0, included = 0;
+	for (i = 0; i < MAXENTRIES; i++)
+		for (j = 0; j < MAXENTRIES; j++)
+			tmp_dmx[i][j] = tmp_imx[i][j] = -99.9;
+	int tfiles = 0, tline = 0, tpars = 0, tskip = 0, tincl = 0;
 	for (c = cstart; c < argc; c++) {
-		fprintf(stderr, " argv[%d], %s\n", c, argv[c]);
+		fprintf(stderr, " Attempt read from argv[%d], %s\n", c, argv[c]);
 		if ((fp = fopen(argv[c], "r")) == NULL)
 			fprintf(stderr, "Could not open filename %s r mode\n", argv[c]), exit(1);
+		int nline = 0, npars = 0, nskip = 0, nincl = 0;
 		while (fgets(line, sizeof(line), fp) != NULL) {
-			/* ALIGNFASTAS output on the HPC is appended with system-generated job run information */
-			if (strncmp(line, "# Completed", 11) == 0) {
-				fprintf(stderr, "End of Alignfastas input detected >>%s<<\n", line);
-				break;
-			}
-			if (strlen(line) == 0 || line[0] == '#')
-				continue;
-			/* if (sscanf(line, "%*s %s %*d %s %*d %*d %*d %*d %*d %*d %*d %*d %*d %lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %*lf %lf", */
 			if (sscanf(line, "%*s %s %*d %s %*d %*d %*d %*d %*d %*d %*d %*d %*d %lf %*f %*f %*f %*f %*f %*f %*f %*f %*f %*f %*f %*f %*f %*f %lf",
-				   label1, label2, &pctid, &sdist) != 4)
-				fprintf(stderr, "Could not sscanf label1, label2, pctid, sdist from line >>%s<<\n", line), exit(1);
-			parsed++;
-			if (subset && ((index1 = flab_index(label1)) < 0 || (index2 = flab_index(label2)) < 0)) {
-				skipped++;
-				continue;
+				   label1, label2, &pctid, &sdist) == 4)
+			{
+				if (subset && ((index1 = flab_index(label1)) < 0 || (index2 = flab_index(label2)) < 0))
+					nskip++;
+				else {
+					d1 = dnode_locate_or_create(label1, NULL), index1 = d1->index;
+					d2 = dnode_locate_or_create(label2, NULL), index2 = d2->index;
+					tmp_imx[index1][index2] = tmp_imx[index2][index1] = 100.0 * pctid;
+					tmp_dmx[index1][index2] = tmp_dmx[index2][index1] = sdist;
+					nincl++;
+				}
+				npars++;
 			}
-			else {
-				included++;
-				d1 = dnode_locate_or_create(label1, NULL), index1 = d1->index;
-				d2 = dnode_locate_or_create(label2, NULL), index2 = d2->index;
-			}
-			if (p_v)
-				fprintf(stderr, "parsed %d skipped %d included %d : g_index %d label1 %s index %d label2 %s index %d pctid %g sdist %g\n",
-					parsed, skipped, included,
-					g_index, label1, flab_index(label1), label2, flab_index(label2), pctid, sdist);
-			tmp_imx[index1][index2] = tmp_imx[index2][index1] = 100.0 * pctid;
-			tmp_dmx[index1][index2] = tmp_dmx[index2][index1] = sdist;
+			nline++;
 		}
 		fclose(fp);
+		fprintf(stderr, "Read_alignfastas %d labels from file %s, %d lines, %d parsed, %d skipped, %d included\n",
+			g_index, argv[c], nline, npars, nskip, nincl);
+		tfiles += 1;
+		tline += nline;
+		tpars += npars;
+		tskip += nskip;
+		tincl += nincl;
 	}
-	fprintf(stderr, "Read_alignfastas %d labels, lines parsed %d, skipped %d, included %d\n",
-		g_index, parsed, skipped, included);
+	fprintf(stderr, "Read_alignfastas %d labels from %d files, %d lines, %d parsed, %d skipped, %d included\n",
+		g_index, tfiles, tline, tpars, tskip, tincl);
+
+	/* check for unfilled matrix elements */
+	int undefined = 0;
+	for (i = 0; i < g_index; i++)
+		for (j = 0; j < g_index; j++)
+			if (tmp_dmx[i][j] < -0.0) {
+				if (undefined < 100)
+					fprintf(stderr, "Undefined distance for labels %s %s dmx[ %d ][ %d ] < -0.0 %lf\n",
+						flab[i], flab[j], i, j, tmp_dmx[i][j]);
+				else if (undefined == 100)
+					fprintf(stderr, "Undefined distances list truncated ...\n");
+				undefined += 1;
+			}
+	fprintf(stderr, "Undefined distance matrix elements %d of %d (%d x %d labels)\n",
+		undefined, g_index * g_index, g_index, g_index);
+	if (undefined > 0)
+		fprintf(stderr, "Program halted.\n"), exit(1);
 
 	/* allocate global distance and percent identity matrices */
 	if ((global_dmx = double_matrix(g_index, g_index)) == NULL)
@@ -3439,19 +3452,11 @@ void read_alf(int argc, char *argv[], int cstart)
 		fprintf(stderr, "could not allocate global_imx double_matrix %d x %d\n", g_index, g_index), exit(1);
 
 	/* fill in global matrices from tmp matrices, and test for undefined values */
-	int undefined = 0;
 	for (i = 0; i < g_index; i++)
 		for (j = 0; j < g_index; j++) {
 			global_dmx[i][j] = tmp_dmx[i][j];
 			global_imx[i][j] = tmp_imx[i][j];
-			if (global_dmx[i][j] < -0.0) {
-				fprintf(stderr, "labels %s %s dmx[ %d ][ %d ] < -0.0 %lf\n",
-					flab[i], flab[j], i, j, global_dmx[i][j]);
-				undefined += 1;
-			}
 		}
-	if (undefined)
-		fprintf(stderr, "Undefined distance matrix elements, program halted.\n"), exit(1);
 	double_matrix_free(MAXENTRIES, MAXENTRIES, tmp_dmx);
 	double_matrix_free(MAXENTRIES, MAXENTRIES, tmp_imx);
 	fprintf(stderr, "Read %d labels\n", g_index);
